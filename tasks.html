@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Задачи — Егор</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#111;color:#f0f0f0;min-height:100vh}
+header{background:#1c1c1e;padding:16px;border-bottom:1px solid #2c2c2e;position:sticky;top:0;z-index:100}
+header h1{font-size:20px;font-weight:700}
+header p{font-size:12px;color:#666;margin-top:2px}
+.tabs{display:flex;background:#1c1c1e;border-bottom:1px solid #2c2c2e;position:sticky;top:53px;z-index:99}
+.tab{flex:1;text-align:center;padding:11px 4px;font-size:13px;font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:#fff;border-bottom-color:#fff}
+.view{display:none;padding:12px 16px 100px}
+.view.active{display:block}
+.chat-box{background:#1c1c1e;border-radius:14px;padding:14px;margin-bottom:12px;min-height:60px}
+.msg{padding:10px 13px;border-radius:12px;font-size:14px;line-height:1.5;margin-bottom:8px;max-width:88%}
+.msg.user{background:#1a56db;color:#fff;margin-left:auto}
+.msg.bot{background:#2c2c2e;color:#f0f0f0}
+.msg.loading{background:#2c2c2e;color:#888;font-style:italic}
+textarea{width:100%;background:#1c1c1e;border:1px solid #2c2c2e;border-radius:12px;padding:12px;font-size:14px;color:#f0f0f0;resize:none;min-height:90px;font-family:inherit}
+textarea:focus{outline:none;border-color:#444}
+textarea::placeholder{color:#555}
+.send-btn{width:100%;margin-top:8px;padding:12px;background:#1a56db;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer}
+.send-btn:active{opacity:0.85}
+.hint{font-size:12px;color:#555;margin-top:6px;text-align:center}
+.section-label{font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
+.task-card{background:#1c1c1e;border-radius:12px;margin-bottom:8px;overflow:hidden}
+.task-main{display:flex;align-items:flex-start;gap:12px;padding:13px}
+.check{width:22px;height:22px;border-radius:50%;border:2px solid #444;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px;transition:all 0.15s}
+.check.done{background:#1a56db;border-color:#1a56db}
+.check svg{display:none}
+.check.done svg{display:block}
+.task-body{flex:1;min-width:0}
+.task-text{font-size:15px;line-height:1.35;color:#f0f0f0}
+.task-text.done{text-decoration:line-through;opacity:0.4}
+.task-desc{font-size:12px;color:#666;margin-top:3px}
+.task-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500}
+.badge.urgent{background:#3a1a1a;color:#ff453a}
+.badge.date{background:#2c2c2e;color:#888}
+.proj-card{background:#1c1c1e;border-radius:12px;margin-bottom:12px;padding:14px}
+.proj-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.proj-dot{width:9px;height:9px;border-radius:50%}
+.proj-name{font-size:15px;font-weight:600;flex:1}
+.proj-pct{font-size:12px;color:#666}
+.prog-bar{height:4px;background:#2c2c2e;border-radius:2px;margin-bottom:10px;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px}
+.empty{text-align:center;color:#555;font-size:14px;padding:30px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Задачи</h1>
+  <p id="hdate"></p>
+</header>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('secretary',this)">Секретарь</button>
+  <button class="tab" onclick="switchTab('today',this)">Сегодня</button>
+  <button class="tab" onclick="switchTab('projects',this)">Проекты</button>
+</div>
+<div class="view active" id="view-secretary">
+  <div class="chat-box" id="chat"></div>
+  <textarea id="tinput" placeholder="Пиши задачи в свободной форме. Например: надо сегодня забрать Петра из больницы до 15, написать Зимину по попкорну до пятницы, на неделе 2 поста для канала..."></textarea>
+  <button class="send-btn" onclick="sendMsg()">Отправить →</button>
+  <div class="hint">Секретарь разберёт текст и разложит задачи по проектам</div>
+</div>
+<div class="view" id="view-today"><div id="today-content"></div></div>
+<div class="view" id="view-projects"><div id="proj-content"></div></div>
+<script>
+const SUPA_URL='https://apijeywkwtjezgeuhkhm.supabase.co';
+const SUPA_KEY='sb_publishable_xYbI9DTHWUME1YZlc2dCCw_jHr9D273';
+const PROJECTS=[
+  {id:'law',name:'Судебное дело',color:'#ff453a'},
+  {id:'popcorn',name:'Rush Попкорн',color:'#ff9f0a'},
+  {id:'politics',name:'Новые люди',color:'#0a84ff'},
+  {id:'fencing',name:'Не тот Королёв',color:'#30d158'},
+  {id:'china',name:'Маркетплейсы',color:'#bf5af2'},
+  {id:'istra',name:'Помещение Истра',color:'#888'},
+  {id:'tma',name:'Telegram Mini Apps',color:'#5ac8fa'},
+  {id:'health',name:'Пётр Михайлович',color:'#ff375f'},
+  {id:'personal',name:'Личное',color:'#aaa'},
+  {id:'other',name:'Разное',color:'#666'},
+];
+let tasks=[];
+async function dbFetch(path,opts={}){
+  const r=await fetch(SUPA_URL+'/rest/v1/'+path,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation',...(opts.headers||{})},
+    ...opts
+  });
+  const txt=await r.text();
+  return txt?JSON.parse(txt):[];
+}
+async function loadTasks(){
+  try{tasks=await dbFetch('tasks?select=*&order=created_at.desc');}catch(e){tasks=[];}
+  renderAll();
+}
+async function toggleTask(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.done=!t.done;
+  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({done:t.done})});
+  renderAll();
+}
+async function sendMsg(){
+  const inp=document.getElementById('tinput');
+  const text=inp.value.trim();if(!text)return;
+  inp.value='';
+  const chat=document.getElementById('chat');
+  const um=document.createElement('div');um.className='msg user';um.textContent=text;chat.appendChild(um);
+  const lm=document.createElement('div');lm.className='msg loading';lm.textContent='Разбираю...';chat.appendChild(lm);
+  const todayISO=new Date().toISOString().split('T')[0];
+  const todayRu=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  const sys=`Ты секретарь. Разбери текст на задачи. Верни ТОЛЬКО JSON массив, без markdown, без пояснений.
+Сегодня: ${todayRu} (${todayISO}).
+Проекты: law=Судебное дело, popcorn=Rush Попкорн, politics=Новые люди, fencing=Не тот Королёв, china=Маркетплейсы, istra=Помещение Истра, tma=Telegram Mini Apps, health=Пётр Михайлович, personal=Личное, other=Разное.
+Формат: [{"text":"...","project":"id","urgent":true/false,"due_date":"YYYY-MM-DD или null","desc":"кратко или null"}]
+Правила: urgent=true если сегодня или очень срочно. personal для личных дел не связанных с проектами.`;
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:text}]})
+    });
+    const data=await resp.json();
+    const raw=(data.content||[]).find(b=>b.type==='text')?.text||'[]';
+    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    for(const t of parsed){
+      const row=await dbFetch('tasks',{method:'POST',body:JSON.stringify({text:t.text,project:t.project||'other',urgent:!!t.urgent,due_date:t.due_date||null,desc:t.desc||null,done:false})});
+      tasks.unshift(Array.isArray(row)?row[0]:row);
+    }
+    lm.classList.remove('loading');
+    lm.textContent='Готово — добавил '+parsed.length+' задач'+( parsed.length===1?'у':parsed.length<5?'и':'');
+    switchTabByName('today');
+  }catch(e){
+    lm.classList.remove('loading');
+    lm.textContent='Ошибка: '+e.message;
+  }
+  renderAll();
+}
+function fmtDate(d){
+  if(!d)return null;
+  const dt=new Date(d+'T00:00:00');
+  const today=new Date();today.setHours(0,0,0,0);
+  const diff=Math.round((dt-today)/86400000);
+  if(diff===0)return'сегодня';if(diff===1)return'завтра';if(diff===-1)return'вчера';
+  if(diff<0)return'просрочено';
+  return dt.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+}
+function makeTaskEl(t){
+  const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
+  const ds=fmtDate(t.due_date);
+  const isUrgent=t.urgent||(t.due_date&&new Date(t.due_date+'T00:00:00')<=new Date());
+  const card=document.createElement('div');card.className='task-card';
+  const main=document.createElement('div');main.className='task-main';
+  main.innerHTML=`
+    <div class="check${t.done?' done':''}" onclick="toggleTask(${t.id})">
+      <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="task-body">
+      <div class="task-text${t.done?' done':''}">${t.text}</div>
+      ${t.desc?`<div class="task-desc">${t.desc}</div>`:''}
+      <div class="task-badges">
+        ${isUrgent?'<span class="badge urgent">срочно</span>':''}
+        ${ds?`<span class="badge date">${ds}</span>`:''}
+        <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
+      </div>
+    </div>`;
+  card.appendChild(main);
+  return card;
+}
+function renderToday(){
+  const c=document.getElementById('today-content');c.innerHTML='';
+  const todayISO=new Date().toISOString().split('T')[0];
+  const urgent=tasks.filter(t=>!t.done&&(t.urgent||(t.due_date&&t.due_date<=todayISO)));
+  const rest=tasks.filter(t=>!t.done&&!t.urgent&&(!t.due_date||t.due_date>todayISO)).slice(0,15);
+  const done=tasks.filter(t=>t.done).slice(0,5);
+  if(!urgent.length&&!rest.length){c.innerHTML='<div class="empty">Задач на сегодня нет 🎉</div>';return;}
+  if(urgent.length){const l=document.createElement('div');l.className='section-label';l.textContent='Срочно';c.appendChild(l);urgent.forEach(t=>c.appendChild(makeTaskEl(t)));}
+  if(rest.length){const l=document.createElement('div');l.className='section-label';l.textContent='Остальные';c.appendChild(l);rest.forEach(t=>c.appendChild(makeTaskEl(t)));}
+  if(done.length){const l=document.createElement('div');l.className='section-label';l.textContent='Выполнено';c.appendChild(l);done.forEach(t=>c.appendChild(makeTaskEl(t)));}
+}
+function renderProjects(){
+  const c=document.getElementById('proj-content');c.innerHTML='';
+  PROJECTS.forEach(proj=>{
+    const pt=tasks.filter(t=>t.project===proj.id);if(!pt.length)return;
+    const done=pt.filter(t=>t.done).length;
+    const pct=Math.round(done/pt.length*100);
+    const card=document.createElement('div');card.className='proj-card';
+    card.innerHTML=`<div class="proj-header"><div class="proj-dot" style="background:${proj.color}"></div><div class="proj-name">${proj.name}</div><div class="proj-pct">${pct}%</div></div><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${proj.color}"></div></div>`;
+    pt.forEach(t=>card.appendChild(makeTaskEl(t)));
+    c.appendChild(card);
+  });
+  if(!tasks.length)c.innerHTML='<div class="empty">Задач пока нет</div>';
+}
+function renderAll(){renderToday();renderProjects();}
+function switchTab(name,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('view-'+name).classList.add('active');
+}
+function switchTabByName(name){
+  const tabs=document.querySelectorAll('.tab');
+  const views=['secretary','today','projects'];
+  const idx=views.indexOf(name);
+  if(idx>=0){tabs.forEach(t=>t.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));tabs[idx].classList.add('active');document.getElementById('view-'+name).classList.add('active');}
+}
+document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.metaKey)sendMsg();});
+const d=new Date();
+document.getElementById('hdate').textContent=d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+loadTasks();
+</script>
+</body>
+</html>
