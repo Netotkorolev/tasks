@@ -28,6 +28,14 @@ textarea::placeholder{color:#555}
 .hint{font-size:12px;color:#555;margin-top:6px;text-align:center}
 .section-label{font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
 .task-card{background:#1c1c1e;border-radius:12px;margin-bottom:8px;overflow:hidden}
+.task-card.dragging{opacity:0.4}
+.board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+.board-col{background:#1c1c1e;border-radius:12px;min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column}
+.board-col.drag-over{outline:2px dashed #1a56db}
+.board-col-header{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;padding:4px 4px 8px}
+.board-col-count{font-size:11px;color:#666;background:#2c2c2e;border-radius:8px;padding:1px 7px}
+.board-col-tasks .task-card{margin-bottom:8px}
+.board-col-tasks .task-card:last-child{margin-bottom:0}
 .task-main{display:flex;align-items:flex-start;gap:12px;padding:13px}
 .check{width:22px;height:22px;border-radius:50%;border:2px solid #444;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px;transition:all 0.15s}
 .check.done{background:#1a56db;border-color:#1a56db}
@@ -101,7 +109,7 @@ textarea::placeholder{color:#555}
 <div class="tabs">
   <button class="tab active" onclick="switchTab('secretary',this)">Секретарь</button>
   <button class="tab" onclick="switchTab('today',this)">Сегодня</button>
-  <button class="tab" onclick="switchTab('all',this)">Все</button>
+  <button class="tab" onclick="switchTab('board',this)">Доска</button>
   <button class="tab" onclick="switchTab('projects',this)">Проекты</button>
   <button class="tab" onclick="switchTab('done',this)">Выполнено</button>
 </div>
@@ -112,7 +120,7 @@ textarea::placeholder{color:#555}
   <div class="hint">Напиши или надиктуй всё одним текстом — секретарь разложит по задачам.</div>
 </div>
 <div class="view" id="view-today"><div id="today-content"></div></div>
-<div class="view" id="view-all"><div id="all-content"></div></div>
+<div class="view" id="view-board"><div class="board" id="board-content"></div></div>
 <div class="view" id="view-projects"><div id="proj-content"></div></div>
 <div class="view" id="view-done"><div id="done-content"></div></div>
 </div>
@@ -335,7 +343,7 @@ async function saveTaskEdit(){
   closeTaskEditor();
   renderAll();
 }
-function makeTaskEl(t){
+function makeTaskEl(t,draggable){
   const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
   const ds=fmtDate(t.due_date);
   const isUrgent=t.urgent||(t.due_date&&new Date(t.due_date+'T00:00:00')<=new Date());
@@ -368,6 +376,15 @@ function makeTaskEl(t){
       </div>
     </div>`;
   card.appendChild(main);
+  if(draggable){
+    card.draggable=true;
+    card.addEventListener('dragstart',e=>{
+      e.dataTransfer.setData('text/plain',String(t.id));
+      e.dataTransfer.effectAllowed='move';
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+  }
   return card;
 }
 function renderToday(){
@@ -394,11 +411,35 @@ function renderProjects(){
   });
   if(!tasks.length)c.innerHTML='<div class="empty">Задач пока нет</div>';
 }
-function renderAllTasks(){
-  const c=document.getElementById('all-content');c.innerHTML='';
-  const active=tasks.filter(t=>!t.done);
-  if(!active.length){c.innerHTML='<div class="empty">Задач нет 🎉</div>';return;}
-  active.forEach(t=>c.appendChild(makeTaskEl(t)));
+async function moveTaskToStatus(id,status){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  const done=status==='done';
+  const patch={status,done};
+  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch)});
+  Object.assign(t,patch);
+  renderAll();
+}
+function renderBoard(){
+  const c=document.getElementById('board-content');c.innerHTML='';
+  STATUS_OPTIONS.forEach(col=>{
+    const colTasks=tasks.filter(t=>(t.status||'next')===col.id);
+    const colEl=document.createElement('div');colEl.className='board-col';
+    const header=document.createElement('div');header.className='board-col-header';
+    header.innerHTML=`<span>${col.name}</span><span class="board-col-count">${colTasks.length}</span>`;
+    colEl.appendChild(header);
+    const body=document.createElement('div');body.className='board-col-tasks';
+    colTasks.forEach(t=>body.appendChild(makeTaskEl(t,true)));
+    colEl.appendChild(body);
+    colEl.addEventListener('dragover',e=>{e.preventDefault();colEl.classList.add('drag-over');});
+    colEl.addEventListener('dragleave',()=>colEl.classList.remove('drag-over'));
+    colEl.addEventListener('drop',e=>{
+      e.preventDefault();
+      colEl.classList.remove('drag-over');
+      const id=Number(e.dataTransfer.getData('text/plain'));
+      if(id)moveTaskToStatus(id,col.id);
+    });
+    c.appendChild(colEl);
+  });
 }
 function renderDone(){
   const c=document.getElementById('done-content');c.innerHTML='';
@@ -406,7 +447,7 @@ function renderDone(){
   if(!done.length){c.innerHTML='<div class="empty">Пока ничего не выполнено</div>';return;}
   done.forEach(t=>c.appendChild(makeTaskEl(t)));
 }
-function renderAll(){renderToday();renderAllTasks();renderProjects();renderDone();}
+function renderAll(){renderToday();renderBoard();renderProjects();renderDone();}
 function switchTab(name,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -415,7 +456,7 @@ function switchTab(name,btn){
 }
 function switchTabByName(name){
   const tabs=document.querySelectorAll('.tab');
-  const views=['secretary','today','all','projects','done'];
+  const views=['secretary','today','board','projects','done'];
   const idx=views.indexOf(name);
   if(idx>=0){tabs.forEach(t=>t.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));tabs[idx].classList.add('active');document.getElementById('view-'+name).classList.add('active');}
 }
