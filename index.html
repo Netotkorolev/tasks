@@ -40,7 +40,9 @@ textarea::placeholder{color:#555}
 .task-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500}
 .badge.urgent{background:#3a1a1a;color:#ff453a}
-.badge.date{background:#2c2c2e;color:#888}
+.badge.important{background:#2a2410;color:#ffd60a}
+.badge.date,.badge.effort,.badge.status{background:#2c2c2e;color:#888}
+.task-notes{font-size:12px;color:#888;margin-top:3px;white-space:pre-wrap}
 .task-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .task-action-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #2c2c2e;background:#2c2c2e;color:#aaa;cursor:pointer;font-family:inherit}
 .task-action-btn:active{opacity:0.7}
@@ -119,13 +121,23 @@ textarea::placeholder{color:#555}
     <h3>Редактировать задачу</h3>
     <label class="field-label" for="edit-text">Текст</label>
     <textarea id="edit-text" rows="3"></textarea>
+    <label class="field-label" for="edit-notes">Заметки</label>
+    <textarea id="edit-notes" rows="2"></textarea>
     <label class="field-label" for="edit-project">Проект</label>
     <select id="edit-project"></select>
     <label class="field-label" for="edit-date">Дата</label>
     <input type="date" id="edit-date">
+    <label class="field-label" for="edit-effort">Объём</label>
+    <select id="edit-effort"></select>
+    <label class="field-label" for="edit-status">Статус</label>
+    <select id="edit-status"></select>
     <div class="checkbox-row">
       <input type="checkbox" id="edit-urgent">
       <label for="edit-urgent">Срочно</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="edit-important">
+      <label for="edit-important">Важно</label>
     </div>
     <div class="modal-actions">
       <button class="cancel-btn" onclick="closeTaskEditor()">Отмена</button>
@@ -149,6 +161,24 @@ const PROJECTS=[
   {id:'personal',name:'Личное',color:'#aaa'},
   {id:'other',name:'Разное',color:'#666'},
 ];
+const EFFORT_OPTIONS=[
+  {id:'',name:'—'},
+  {id:'2m',name:'2 мин'},
+  {id:'5m',name:'5 мин'},
+  {id:'15m',name:'15 мин'},
+  {id:'30m',name:'30 мин'},
+  {id:'60m',name:'60 мин'},
+  {id:'elephant',name:'Слон'},
+];
+const STATUS_OPTIONS=[
+  {id:'inbox',name:'Inbox'},
+  {id:'next',name:'Далее'},
+  {id:'scheduled',name:'Запланировано'},
+  {id:'waiting',name:'Ожидание'},
+  {id:'someday',name:'Когда-нибудь'},
+  {id:'done',name:'Готово'},
+];
+const STATUS_LABELS=Object.fromEntries(STATUS_OPTIONS.map(o=>[o.id,o.name]));
 const supabaseClient=supabase.createClient(SUPA_URL,SUPA_KEY);
 let tasks=[];
 async function dbFetch(path,opts={}){
@@ -270,9 +300,13 @@ function openTaskEditor(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   editingTaskId=id;
   document.getElementById('edit-text').value=t.text||'';
+  document.getElementById('edit-notes').value=t.notes||'';
   document.getElementById('edit-project').value=t.project||'other';
   document.getElementById('edit-date').value=t.due_date||'';
+  document.getElementById('edit-effort').value=t.effort||'';
+  document.getElementById('edit-status').value=t.status||'next';
   document.getElementById('edit-urgent').checked=!!t.urgent;
+  document.getElementById('edit-important').checked=!!t.important;
   document.getElementById('edit-overlay').classList.add('active');
 }
 function closeTaskEditor(){
@@ -283,12 +317,18 @@ async function saveTaskEdit(){
   if(editingTaskId===null)return;
   const text=document.getElementById('edit-text').value.trim();
   if(!text){alert('Текст задачи не может быть пустым');return;}
+  const status=document.getElementById('edit-status').value||'next';
   const patch={
     text,
     project:document.getElementById('edit-project').value,
     due_date:document.getElementById('edit-date').value||null,
-    urgent:document.getElementById('edit-urgent').checked
+    urgent:document.getElementById('edit-urgent').checked,
+    notes:document.getElementById('edit-notes').value.trim()||null,
+    important:document.getElementById('edit-important').checked,
+    effort:document.getElementById('edit-effort').value||null,
+    status
   };
+  if(status==='done')patch.done=true;
   await dbFetch('tasks?id=eq.'+editingTaskId,{method:'PATCH',body:JSON.stringify(patch)});
   const t=tasks.find(x=>x.id===editingTaskId);
   if(t)Object.assign(t,patch);
@@ -299,6 +339,11 @@ function makeTaskEl(t){
   const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
   const ds=fmtDate(t.due_date);
   const isUrgent=t.urgent||(t.due_date&&new Date(t.due_date+'T00:00:00')<=new Date());
+  let effortLabel='';
+  if(t.effort==='2m'||t.effort==='5m')effortLabel='⚡ '+t.effort;
+  else if(t.effort==='elephant')effortLabel='🐘';
+  else if(t.effort)effortLabel=t.effort;
+  const statusLabel=(t.status&&t.status!=='next')?STATUS_LABELS[t.status]:null;
   const card=document.createElement('div');card.className='task-card';
   const main=document.createElement('div');main.className='task-main';
   main.innerHTML=`
@@ -308,9 +353,13 @@ function makeTaskEl(t){
     <div class="task-body">
       <div class="task-text${t.done?' done':''}">${t.text}</div>
       ${t.desc?`<div class="task-desc">${t.desc}</div>`:''}
+      ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
       <div class="task-badges">
+        ${t.important?'<span class="badge important">важно</span>':''}
         ${isUrgent?'<span class="badge urgent">срочно</span>':''}
+        ${effortLabel?`<span class="badge effort">${effortLabel}</span>`:''}
         ${ds?`<span class="badge date">${ds}</span>`:''}
+        ${statusLabel?`<span class="badge status">${statusLabel}</span>`:''}
         <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
       </div>
       <div class="task-actions">
@@ -371,6 +420,8 @@ function switchTabByName(name){
   if(idx>=0){tabs.forEach(t=>t.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));tabs[idx].classList.add('active');document.getElementById('view-'+name).classList.add('active');}
 }
 document.getElementById('edit-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+document.getElementById('edit-effort').innerHTML=EFFORT_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
+document.getElementById('edit-status').innerHTML=STATUS_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))sendMsg();});
 document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 const d=new Date();
