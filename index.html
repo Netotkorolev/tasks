@@ -10,8 +10,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 header{background:#1c1c1e;padding:16px;border-bottom:1px solid #2c2c2e;position:sticky;top:0;z-index:100}
 header h1{font-size:20px;font-weight:700}
 header p{font-size:12px;color:#666;margin-top:2px}
-.tabs{display:flex;background:#1c1c1e;border-bottom:1px solid #2c2c2e;position:sticky;top:53px;z-index:99}
-.tab{flex:1;text-align:center;padding:11px 4px;font-size:13px;font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent}
+.tabs{display:flex;background:#1c1c1e;border-bottom:1px solid #2c2c2e;position:sticky;top:53px;z-index:99;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{flex:0 0 auto;min-width:64px;text-align:center;padding:11px 10px;font-size:12px;font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 .tab.active{color:#fff;border-bottom-color:#fff}
 .view{display:none;padding:12px 16px 100px}
 .view.active{display:block}
@@ -20,7 +20,7 @@ header p{font-size:12px;color:#666;margin-top:2px}
 .msg.user{background:#1a56db;color:#fff;margin-left:auto}
 .msg.bot{background:#2c2c2e;color:#f0f0f0}
 .msg.loading{background:#2c2c2e;color:#888;font-style:italic}
-textarea{width:100%;background:#1c1c1e;border:1px solid #2c2c2e;border-radius:12px;padding:12px;font-size:14px;color:#f0f0f0;resize:none;min-height:90px;font-family:inherit}
+textarea{width:100%;background:#1c1c1e;border:1px solid #2c2c2e;border-radius:12px;padding:14px;font-size:16px;line-height:1.4;color:#f0f0f0;resize:vertical;min-height:140px;font-family:inherit}
 textarea:focus{outline:none;border-color:#444}
 textarea::placeholder{color:#555}
 .send-btn{width:100%;margin-top:8px;padding:12px;background:#1a56db;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer}
@@ -82,16 +82,20 @@ textarea::placeholder{color:#555}
 <div class="tabs">
   <button class="tab active" onclick="switchTab('secretary',this)">Секретарь</button>
   <button class="tab" onclick="switchTab('today',this)">Сегодня</button>
+  <button class="tab" onclick="switchTab('all',this)">Все</button>
   <button class="tab" onclick="switchTab('projects',this)">Проекты</button>
+  <button class="tab" onclick="switchTab('done',this)">Выполнено</button>
 </div>
 <div class="view active" id="view-secretary">
   <div class="chat-box" id="chat"></div>
   <textarea id="tinput" placeholder="Пиши задачи в свободной форме. Например: надо сегодня забрать Петра из больницы до 15, написать Зимину по попкорну до пятницы, на неделе 2 поста для канала..."></textarea>
-  <button class="send-btn" onclick="sendMsg()">Отправить →</button>
-  <div class="hint">Секретарь разберёт текст и разложит задачи по проектам</div>
+  <button class="send-btn" onclick="sendMsg()">Разобрать задачи</button>
+  <div class="hint">Напиши или надиктуй всё одним текстом — секретарь разложит по задачам.</div>
 </div>
 <div class="view" id="view-today"><div id="today-content"></div></div>
+<div class="view" id="view-all"><div id="all-content"></div></div>
 <div class="view" id="view-projects"><div id="proj-content"></div></div>
+<div class="view" id="view-done"><div id="done-content"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -266,7 +270,19 @@ function renderProjects(){
   });
   if(!tasks.length)c.innerHTML='<div class="empty">Задач пока нет</div>';
 }
-function renderAll(){renderToday();renderProjects();}
+function renderAllTasks(){
+  const c=document.getElementById('all-content');c.innerHTML='';
+  const active=tasks.filter(t=>!t.done);
+  if(!active.length){c.innerHTML='<div class="empty">Задач нет 🎉</div>';return;}
+  active.forEach(t=>c.appendChild(makeTaskEl(t)));
+}
+function renderDone(){
+  const c=document.getElementById('done-content');c.innerHTML='';
+  const done=tasks.filter(t=>t.done);
+  if(!done.length){c.innerHTML='<div class="empty">Пока ничего не выполнено</div>';return;}
+  done.forEach(t=>c.appendChild(makeTaskEl(t)));
+}
+function renderAll(){renderToday();renderAllTasks();renderProjects();renderDone();}
 function switchTab(name,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -275,11 +291,11 @@ function switchTab(name,btn){
 }
 function switchTabByName(name){
   const tabs=document.querySelectorAll('.tab');
-  const views=['secretary','today','projects'];
+  const views=['secretary','today','all','projects','done'];
   const idx=views.indexOf(name);
   if(idx>=0){tabs.forEach(t=>t.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));tabs[idx].classList.add('active');document.getElementById('view-'+name).classList.add('active');}
 }
-document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.metaKey)sendMsg();});
+document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))sendMsg();});
 document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 const d=new Date();
 document.getElementById('hdate').textContent=d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
