@@ -7,6 +7,8 @@ const corsHeaders = {
 };
 
 const ALLOWED_PROJECTS = ['law', 'popcorn', 'politics', 'fencing', 'china', 'istra', 'tma', 'health', 'personal', 'other'];
+const ALLOWED_EFFORT = ['2m', '5m', '15m', '30m', '60m', 'elephant'];
+const ALLOWED_STATUS = ['inbox', 'next', 'scheduled', 'waiting', 'someday'];
 const MAX_TASKS = 20;
 
 const TASK_SCHEMA = {
@@ -20,10 +22,14 @@ const TASK_SCHEMA = {
           text: { type: 'string' },
           project: { type: 'string', enum: ALLOWED_PROJECTS },
           urgent: { type: 'boolean' },
+          important: { type: 'boolean' },
           due_date: { type: ['string', 'null'] },
+          notes: { type: ['string', 'null'] },
+          effort: { type: ['string', 'null'], enum: [...ALLOWED_EFFORT, null] },
+          status: { type: 'string', enum: ALLOWED_STATUS },
           desc: { type: ['string', 'null'] },
         },
-        required: ['text', 'project', 'urgent', 'due_date', 'desc'],
+        required: ['text', 'project', 'urgent', 'important', 'due_date', 'notes', 'effort', 'status', 'desc'],
         additionalProperties: false,
       },
     },
@@ -43,11 +49,11 @@ function buildSystemPrompt(): string {
   const today = new Date();
   const todayISO = today.toISOString().split('T')[0];
   const todayRu = today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-  return `Ты — личный ассистент Егора по задачам. Преобразуй хаотичный русский текст в структурированные задачи.
+  return `Ты — личный ассистент Егора по задачам. Преобразуй хаотичный русский текст в структурированные задачи по методологии GTD (Getting Things Done) и матрице Эйзенхауэра.
 
 Сегодня: ${todayRu} (${todayISO}).
 
-Правила:
+Базовые правила:
 - Одна задача = одно действие.
 - Убирай мусорные слова: "надо", "не забыть", "короче", "в общем".
 - Сохраняй имена, сроки и контекст.
@@ -68,17 +74,53 @@ health — врач, больница, здоровье, лекарство, а�
 personal — семья, дом, машина, покупка, личное
 other — всё неясное
 
-Срочность:
-urgent = true, если задача на сегодня/завтра, связана с судом, больницей, врачом, налоговой, деньгами, встречей, документами или явно звучит срочно. Иначе false.`;
+Эйзенхауэр: urgent и important — независимые признаки, оценивай каждый отдельно. Задача может быть срочной, но не важной, и наоборот.
+
+Срочность (urgent):
+urgent = true, если задача на сегодня/завтра, связана с судом, больницей, врачом, налоговой, деньгами, встречей, документами или явно звучит срочно. Иначе false.
+
+Важность (important):
+important = true, если задача влияет на деньги, суд, здоровье, важную встречу, партнёрство, стратегию, семью, дедлайн или ключевой проект. Иначе false.
+
+Статус (status) — этап GTD, один из: inbox, next, scheduled, waiting, someday.
+- inbox — формулировка сырая или непонятная, требует уточнения, не готова к действию.
+- scheduled — есть конкретная дата (due_date задан).
+- next — понятная активная задача без даты, можно делать в любой момент.
+- waiting — задача зависит от ответа или действия другого человека, ты ждёшь.
+- someday — идея или необязательная задача "когда-нибудь", не сейчас.
+status НИКОГДА не равен "done" — этот статус ставит только пользователь вручную после выполнения.
+
+Объём (effort) — оценка размера задачи: 2m, 5m, 15m, 30m, 60m, elephant, или null, если непонятно.
+- 2m — мгновенное действие (написать одно сообщение, сказать одну вещь).
+- 5m — "молния": быстрая задача, можно сделать между делом.
+- 15m — короткая задача с небольшим фокусом.
+- 30m — обычная задача.
+- 60m — большая задача, требует час непрерывного внимания.
+- elephant — "слон": большая растянутая задача, которую нельзя сделать за один присест, нужно дробить на куски или делать регулярно.
+
+Заметки (notes):
+- Перенеси сюда важный контекст из исходного текста: детали, условия, имена, что обсудить, нюансы.
+- notes = null, если дополнительного контекста нет.
+- notes не должны дублировать text — это дополнение, а не повтор.
+
+desc:
+- Короткое опциональное уточнение задачи. Можно оставить null, если всё уже сказано в text/notes.`;
 }
 
 function validateTask(t: any) {
   if (!t || typeof t.text !== 'string' || !t.text.trim()) return null;
+  const text = t.text.trim();
   const project = ALLOWED_PROJECTS.includes(t.project) ? t.project : 'other';
   const urgent = !!t.urgent;
+  const important = !!t.important;
   const due_date = typeof t.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.due_date) ? t.due_date : null;
   const desc = typeof t.desc === 'string' && t.desc.trim() ? t.desc.trim() : null;
-  return { text: t.text.trim(), project, urgent, due_date, desc, done: false };
+  let notes = typeof t.notes === 'string' && t.notes.trim() ? t.notes.trim() : null;
+  if (notes && notes === text) notes = null;
+  const effort = ALLOWED_EFFORT.includes(t.effort) ? t.effort : null;
+  let status = ALLOWED_STATUS.includes(t.status) ? t.status : null;
+  if (!status) status = due_date ? 'scheduled' : 'next';
+  return { text, project, urgent, important, due_date, notes, effort, status, desc, done: false };
 }
 
 Deno.serve(async (req) => {
