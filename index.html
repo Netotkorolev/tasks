@@ -228,8 +228,6 @@ function fmtDate(d){
   if(diff<0)return'просрочено';
   return dt.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
 }
-function todayISO(){return new Date().toISOString().split('T')[0];}
-function tomorrowISO(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().split('T')[0];}
 async function deleteTask(id){
   await dbFetch('tasks?id=eq.'+id,{method:'DELETE'});
   tasks=tasks.filter(t=>t.id!==id);
@@ -241,8 +239,23 @@ async function setTaskDate(id,date){
   if(t)t.due_date=date;
   renderAll();
 }
-function setTaskToday(id){setTaskDate(id,todayISO());}
-function setTaskTomorrow(id){setTaskDate(id,tomorrowISO());}
+function pickTaskDate(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  const input=document.createElement('input');
+  input.type='date';
+  if(t.due_date)input.value=t.due_date;
+  input.style.position='fixed';
+  input.style.left='-1000px';
+  input.style.opacity='0';
+  document.body.appendChild(input);
+  input.addEventListener('change',()=>{
+    if(input.value)setTaskDate(id,input.value);
+    input.remove();
+  });
+  input.addEventListener('blur',()=>input.remove());
+  if(input.showPicker)input.showPicker();
+  else input.focus();
+}
 async function editTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   const newText=prompt('Текст задачи:',t.text);
@@ -273,8 +286,8 @@ function makeTaskEl(t){
       </div>
       <div class="task-actions">
         <button class="task-action-btn" onclick="editTask(${t.id})">Редактировать</button>
-        <button class="task-action-btn" onclick="setTaskToday(${t.id})">Сегодня</button>
-        <button class="task-action-btn" onclick="setTaskTomorrow(${t.id})">Завтра</button>
+        <button class="task-action-btn" onclick="pickTaskDate(${t.id})">Дата</button>
+        <button class="task-action-btn" onclick="setTaskDate(${t.id},null)">Без даты</button>
         <button class="task-action-btn danger" onclick="deleteTask(${t.id})">Удалить</button>
       </div>
     </div>`;
