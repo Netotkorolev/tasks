@@ -153,41 +153,64 @@ async function toggleTask(id){
   renderAll();
 }
 async function sendMsg(){
-  const inp=document.getElementById('tinput');
-  const text=inp.value.trim();if(!text)return;
-  inp.value='';
-  const chat=document.getElementById('chat');
-  const um=document.createElement('div');um.className='msg user';um.textContent=text;chat.appendChild(um);
-  const lm=document.createElement('div');lm.className='msg loading';lm.textContent='Разбираю...';chat.appendChild(lm);
-  const todayISO=new Date().toISOString().split('T')[0];
-  const todayRu=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
-  const sys=`Ты секретарь. Разбери текст на задачи. Верни ТОЛЬКО JSON массив, без markdown, без пояснений.
-Сегодня: ${todayRu} (${todayISO}).
-Проекты: law=Судебное дело, popcorn=Rush Попкорн, politics=Новые люди, fencing=Не тот Королёв, china=Маркетплейсы, istra=Помещение Истра, tma=Telegram Mini Apps, health=Пётр Михайлович, personal=Личное, other=Разное.
-Формат: [{"text":"...","project":"id","urgent":true/false,"due_date":"YYYY-MM-DD или null","desc":"кратко или null"}]
-Правила: urgent=true если сегодня или очень срочно. personal для личных дел не связанных с проектами.`;
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:[{role:'user',content:text}]})
-    });
-    const data=await resp.json();
-    const raw=(data.content||[]).find(b=>b.type==='text')?.text||'[]';
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    for(const t of parsed){
-      const row=await dbFetch('tasks',{method:'POST',body:JSON.stringify({text:t.text,project:t.project||'other',urgent:!!t.urgent,due_date:t.due_date||null,desc:t.desc||null,done:false})});
-      tasks.unshift(Array.isArray(row)?row[0]:row);
+  const inp = document.getElementById('tinput');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  inp.value = '';
+
+  const chat = document.getElementById('chat');
+
+  const um = document.createElement('div');
+  um.className = 'msg user';
+  um.textContent = text;
+  chat.appendChild(um);
+
+  const lm = document.createElement('div');
+  lm.className = 'msg loading';
+  lm.textContent = 'Разбираю...';
+  chat.appendChild(lm);
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (!session || !session.access_token) {
+      throw new Error('Нужно войти заново');
     }
+
+    const resp = await fetch(SUPA_URL + '/functions/v1/parse-tasks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + session.access_token
+      },
+      body: JSON.stringify({ input: text })
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      throw new Error(data.error || 'Не удалось разобрать текст');
+    }
+
+    const created = data.created || [];
+
+    for (const row of created) {
+      tasks.unshift(row);
+    }
+
     lm.classList.remove('loading');
-    lm.textContent='Готово — добавил '+parsed.length+' задач'+( parsed.length===1?'у':parsed.length<5?'и':'');
+    lm.textContent = 'Создано задач: ' + created.length;
+
+    renderAll();
     switchTabByName('today');
-  }catch(e){
+  } catch (e) {
     lm.classList.remove('loading');
-    lm.textContent='Ошибка: '+e.message;
+    lm.textContent = 'Ошибка: ' + (e instanceof Error ? e.message : String(e));
   }
-  renderAll();
 }
+
 function fmtDate(d){
   if(!d)return null;
   const dt=new Date(d+'T00:00:00');

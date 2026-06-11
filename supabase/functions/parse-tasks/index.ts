@@ -1,0 +1,163 @@
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+const ALLOWED_PROJECTS = ['law', 'popcorn', 'politics', 'fencing', 'china', 'istra', 'tma', 'health', 'personal', 'other'];
+const MAX_TASKS = 20;
+
+const TASK_SCHEMA = {
+  type: 'object',
+  properties: {
+    tasks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+          project: { type: 'string', enum: ALLOWED_PROJECTS },
+          urgent: { type: 'boolean' },
+          due_date: { type: ['string', 'null'] },
+          desc: { type: ['string', 'null'] },
+        },
+        required: ['text', 'project', 'urgent', 'due_date', 'desc'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['tasks'],
+  additionalProperties: false,
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+function buildSystemPrompt(): string {
+  const today = new Date();
+  const todayISO = today.toISOString().split('T')[0];
+  const todayRu = today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  return `Ты — личный ассистент Егора по задачам. Преобразуй хаотичный русский текст в структурированные задачи.
+
+Сегодня: ${todayRu} (${todayISO}).
+
+Правила:
+- Одна задача = одно действие.
+- Убирай мусорные слова: "надо", "не забыть", "короче", "в общем".
+- Сохраняй имена, сроки и контекст.
+- Если в одной фразе несколько дел — создай несколько задач.
+- Если проект неясен — project = "other".
+- Если дата неясна — due_date = null.
+- due_date в формате YYYY-MM-DD или null.
+
+Проекты:
+law — суд, дедушка, нотариус, договор, ФНС, налоговая, юрист, документы
+popcorn — Зимин, попкорн, Rush, Пуканцы, Попкульт, локация, франшиза
+politics — Новые люди, депутат, выборы, Химки, карта первых дел
+fencing — Саша, фехтование, тренировка, сабля, турнир, СШОР
+china — Ozon, Wildberries, Китай, Wondersell, магазин, блокировка
+istra — Истра
+tma — бот, TMA, mini app, Cursor, Claude, ChatGPT, сайт, разработка
+health — врач, больница, здоровье, лекарство, анализы, тесть, Пётр
+personal — семья, дом, машина, покупка, личное
+other — всё неясное
+
+Срочность:
+urgent = true, если задача на сегодня/завтра, связана с судом, больницей, врачом, налоговой, деньгами, встречей, документами или явно звучит срочно. Иначе false.`;
+}
+
+function validateTask(t: any) {
+  if (!t || typeof t.text !== 'string' || !t.text.trim()) return null;
+  const project = ALLOWED_PROJECTS.includes(t.project) ? t.project : 'other';
+  const urgent = !!t.urgent;
+  const due_date = typeof t.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.due_date) ? t.due_date : null;
+  const desc = typeof t.desc === 'string' && t.desc.trim() ? t.desc.trim() : null;
+  return { text: t.text.trim(), project, urgent, due_date, desc, done: false };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return jsonResponse({ error: 'Нет авторизации' }, 401);
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      return jsonResponse({ error: 'Нет авторизации' }, 401);
+    }
+
+    const body = await req.json().catch(() => null);
+    const input = body?.input;
+    if (!input || typeof input !== 'string' || !input.trim()) {
+      return jsonResponse({ error: 'Текст не может быть пустым' }, 400);
+    }
+
+    const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + Deno.env.get('OPENAI_API_KEY'),
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-mini',
+        max_tokens: 2000,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: input },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'extracted_tasks', strict: true, schema: TASK_SCHEMA },
+        },
+      }),
+    });
+
+    if (!openaiResp.ok) {
+      const errText = await openaiResp.text();
+      return jsonResponse({ error: 'Ошибка OpenAI API: ' + errText }, 502);
+    }
+
+    const completion = await openaiResp.json();
+    const content = completion.choices?.[0]?.message?.content;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return jsonResponse({ error: 'Модель вернула некорректный ответ' }, 502);
+    }
+
+    const rawTasks = Array.isArray(parsed?.tasks) ? parsed.tasks.slice(0, MAX_TASKS) : [];
+    const validTasks = rawTasks.map(validateTask).filter((t: any) => t !== null);
+    if (!validTasks.length) {
+      return jsonResponse({ error: 'Не удалось выделить ни одной задачи из текста' }, 422);
+    }
+
+    const { data: created, error: insertError } = await supabaseClient
+      .from('tasks')
+      .insert(validTasks)
+      .select();
+    if (insertError) {
+      return jsonResponse({ error: 'Ошибка сохранения задач: ' + insertError.message }, 500);
+    }
+
+    return jsonResponse({ ok: true, created });
+  } catch (e) {
+    return jsonResponse({ error: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
