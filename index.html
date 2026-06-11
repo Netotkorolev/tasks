@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>Задачи — Егор</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -13,7 +13,7 @@ header p{font-size:12px;color:#666;margin-top:2px}
 .tabs{display:flex;background:#1c1c1e;border-bottom:1px solid #2c2c2e;position:sticky;top:53px;z-index:99;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tab{flex:0 0 auto;min-width:64px;text-align:center;padding:11px 10px;font-size:12px;font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 .tab.active{color:#fff;border-bottom-color:#fff}
-.view{display:none;padding:12px 16px 100px}
+.view{display:none;padding:12px 16px calc(env(safe-area-inset-bottom) + 90px)}
 .view.active{display:block}
 .chat-box{background:#1c1c1e;border-radius:14px;padding:14px;margin-bottom:12px;min-height:60px}
 .msg{padding:10px 13px;border-radius:12px;font-size:14px;line-height:1.5;margin-bottom:8px;max-width:88%}
@@ -27,18 +27,18 @@ textarea::placeholder{color:#555}
 .send-btn:active{opacity:0.85}
 .hint{font-size:12px;color:#555;margin-top:6px;text-align:center}
 .section-label{font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
-.task-card{background:#1c1c1e;border-radius:12px;margin-bottom:8px;overflow:hidden}
+.task-card{background:#1c1c1e;border-radius:12px;margin-bottom:8px;overflow:hidden;position:relative}
 .task-card.dragging{opacity:0.4}
 .task-card.overdue{border:1px solid rgba(255,69,58,0.35);background:#221616}
 .badge.date.overdue{background:#3a1a1a;color:#ff453a}
-.board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
-.board-col{background:#1c1c1e;border-radius:12px;min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column}
+.board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scroll-snap-type:x mandatory}
+.board-col{background:#1c1c1e;border-radius:12px;min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column;scroll-snap-align:start}
 .board-col.drag-over{outline:2px dashed #1a56db}
 .board-col-header{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.5px;padding:4px 4px 8px}
 .board-col-count{font-size:11px;color:#666;background:#2c2c2e;border-radius:8px;padding:1px 7px}
 .board-col-tasks .task-card{margin-bottom:8px}
 .board-col-tasks .task-card:last-child{margin-bottom:0}
-.task-main{display:flex;align-items:flex-start;gap:12px;padding:13px}
+.task-main{display:flex;align-items:flex-start;gap:12px;padding:13px 34px 13px 13px}
 .check{width:22px;height:22px;border-radius:50%;border:2px solid #444;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px;transition:all 0.15s}
 .check.done{background:#1a56db;border-color:#1a56db}
 .check svg{display:none}
@@ -47,16 +47,19 @@ textarea::placeholder{color:#555}
 .task-text{font-size:15px;line-height:1.35;color:#f0f0f0}
 .task-text.done{text-decoration:line-through;opacity:0.4}
 .task-desc{font-size:12px;color:#666;margin-top:3px}
-.task-badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500}
+.task-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.badge{font-size:10px;padding:2px 6px;border-radius:6px;font-weight:500}
 .badge.urgent{background:#3a1a1a;color:#ff453a}
 .badge.important{background:#2a2410;color:#ffd60a}
 .badge.date,.badge.effort,.badge.status{background:#2c2c2e;color:#888}
-.task-notes{font-size:12px;color:#888;margin-top:3px;white-space:pre-wrap}
-.task-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.task-action-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #2c2c2e;background:#2c2c2e;color:#aaa;cursor:pointer;font-family:inherit}
-.task-action-btn:active{opacity:0.7}
-.task-action-btn.danger{color:#ff453a}
+.task-notes{font-size:12px;color:#888;margin-top:3px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.task-menu-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border:none;background:transparent;color:#666;font-size:18px;line-height:1;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.task-menu-btn:active{background:#2c2c2e}
+.task-menu{display:none;position:absolute;top:32px;right:6px;background:#2c2c2e;border-radius:10px;overflow:hidden;z-index:10;min-width:130px;box-shadow:0 4px 16px rgba(0,0,0,0.4)}
+.task-menu.open{display:block}
+.task-menu button{display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px;background:none;border:none;color:#f0f0f0;cursor:pointer;font-family:inherit}
+.task-menu button:active{background:#3a3a3c}
+.task-menu button.danger{color:#ff453a}
 .proj-card{background:#1c1c1e;border-radius:12px;margin-bottom:12px;padding:14px}
 .proj-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .proj-dot{width:9px;height:9px;border-radius:50%}
@@ -86,6 +89,10 @@ textarea::placeholder{color:#555}
 .modal-actions button{flex:1;padding:12px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
 .modal-actions .save-btn{background:#1a56db;color:#fff}
 .modal-actions .cancel-btn{background:#2c2c2e;color:#aaa}
+@media (max-width:480px){
+  .task-main{padding:9px 32px 9px 11px;gap:10px}
+  .board-col{min-width:85vw;flex:0 0 85vw}
+}
 </style>
 </head>
 <body>
@@ -315,6 +322,16 @@ async function deleteTask(id){
   tasks=tasks.filter(t=>t.id!==id);
   renderAll();
 }
+function closeAllTaskMenus(){
+  document.querySelectorAll('.task-menu.open').forEach(m=>m.classList.remove('open'));
+}
+function toggleTaskMenu(e,btn){
+  e.stopPropagation();
+  const menu=btn.nextElementSibling;
+  const willOpen=!menu.classList.contains('open');
+  closeAllTaskMenus();
+  if(willOpen)menu.classList.add('open');
+}
 let editingTaskId=null;
 function openTaskEditor(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
@@ -384,10 +401,11 @@ function makeTaskEl(t,draggable){
         ${statusLabel?`<span class="badge status">${statusLabel}</span>`:''}
         <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
       </div>
-      <div class="task-actions">
-        <button class="task-action-btn" onclick="openTaskEditor(${t.id})">Редактировать</button>
-        <button class="task-action-btn danger" onclick="deleteTask(${t.id})">Удалить</button>
-      </div>
+    </div>
+    <button class="task-menu-btn" onclick="toggleTaskMenu(event,this)">⋯</button>
+    <div class="task-menu">
+      <button onclick="closeAllTaskMenus();openTaskEditor(${t.id})">Редактировать</button>
+      <button class="danger" onclick="closeAllTaskMenus();deleteTask(${t.id})">Удалить</button>
     </div>`;
   card.appendChild(main);
   if(draggable){
@@ -477,6 +495,7 @@ function switchTabByName(name){
 document.getElementById('edit-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
 document.getElementById('edit-effort').innerHTML=EFFORT_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.getElementById('edit-status').innerHTML=STATUS_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
+document.addEventListener('click',closeAllTaskMenus);
 document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))sendMsg();});
 document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 const d=new Date();
