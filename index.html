@@ -41,6 +41,10 @@ textarea::placeholder{color:#555}
 .badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500}
 .badge.urgent{background:#3a1a1a;color:#ff453a}
 .badge.date{background:#2c2c2e;color:#888}
+.task-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.task-action-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid #2c2c2e;background:#2c2c2e;color:#aaa;cursor:pointer;font-family:inherit}
+.task-action-btn:active{opacity:0.7}
+.task-action-btn.danger{color:#ff453a}
 .proj-card{background:#1c1c1e;border-radius:12px;margin-bottom:12px;padding:14px}
 .proj-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .proj-dot{width:9px;height:9px;border-radius:50%}
@@ -224,6 +228,31 @@ function fmtDate(d){
   if(diff<0)return'просрочено';
   return dt.toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
 }
+function todayISO(){return new Date().toISOString().split('T')[0];}
+function tomorrowISO(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().split('T')[0];}
+async function deleteTask(id){
+  await dbFetch('tasks?id=eq.'+id,{method:'DELETE'});
+  tasks=tasks.filter(t=>t.id!==id);
+  renderAll();
+}
+async function setTaskDate(id,date){
+  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({due_date:date})});
+  const t=tasks.find(x=>x.id===id);
+  if(t)t.due_date=date;
+  renderAll();
+}
+function setTaskToday(id){setTaskDate(id,todayISO());}
+function setTaskTomorrow(id){setTaskDate(id,tomorrowISO());}
+async function editTask(id){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  const newText=prompt('Текст задачи:',t.text);
+  if(newText===null)return;
+  const trimmed=newText.trim();
+  if(!trimmed)return;
+  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({text:trimmed})});
+  t.text=trimmed;
+  renderAll();
+}
 function makeTaskEl(t){
   const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
   const ds=fmtDate(t.due_date);
@@ -241,6 +270,12 @@ function makeTaskEl(t){
         ${isUrgent?'<span class="badge urgent">срочно</span>':''}
         ${ds?`<span class="badge date">${ds}</span>`:''}
         <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
+      </div>
+      <div class="task-actions">
+        <button class="task-action-btn" onclick="editTask(${t.id})">Редактировать</button>
+        <button class="task-action-btn" onclick="setTaskToday(${t.id})">Сегодня</button>
+        <button class="task-action-btn" onclick="setTaskTomorrow(${t.id})">Завтра</button>
+        <button class="task-action-btn danger" onclick="deleteTask(${t.id})">Удалить</button>
       </div>
     </div>`;
   card.appendChild(main);
