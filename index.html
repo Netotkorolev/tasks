@@ -61,6 +61,19 @@ textarea::placeholder{color:#555}
 .login-error{color:#ff453a;font-size:13px;margin-top:8px;text-align:center;min-height:16px}
 .header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .logout-btn{background:none;border:1px solid #2c2c2e;color:#888;font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;flex-shrink:0}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.active{display:flex}
+.modal-box{background:#1c1c1e;border-radius:14px;padding:18px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto}
+.modal-box h3{font-size:16px;margin-bottom:14px}
+.field-label{font-size:12px;color:#888;margin:10px 0 5px;display:block}
+.modal-box input[type=text],.modal-box input[type=date],.modal-box select,.modal-box textarea{width:100%;background:#111;border:1px solid #2c2c2e;border-radius:10px;padding:11px;font-size:14px;color:#f0f0f0;font-family:inherit}
+.modal-box input:focus,.modal-box select:focus,.modal-box textarea:focus{outline:none;border-color:#444}
+.checkbox-row{display:flex;align-items:center;gap:8px;margin-top:12px}
+.checkbox-row input{width:auto}
+.modal-actions{display:flex;gap:8px;margin-top:18px}
+.modal-actions button{flex:1;padding:12px;border-radius:10px;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.modal-actions .save-btn{background:#1a56db;color:#fff}
+.modal-actions .cancel-btn{background:#2c2c2e;color:#aaa}
 </style>
 </head>
 <body>
@@ -101,6 +114,25 @@ textarea::placeholder{color:#555}
 <div class="view" id="view-projects"><div id="proj-content"></div></div>
 <div class="view" id="view-done"><div id="done-content"></div></div>
 </div>
+<div class="modal-overlay" id="edit-overlay">
+  <div class="modal-box">
+    <h3>Редактировать задачу</h3>
+    <label class="field-label" for="edit-text">Текст</label>
+    <textarea id="edit-text" rows="3"></textarea>
+    <label class="field-label" for="edit-project">Проект</label>
+    <select id="edit-project"></select>
+    <label class="field-label" for="edit-date">Дата</label>
+    <input type="date" id="edit-date">
+    <div class="checkbox-row">
+      <input type="checkbox" id="edit-urgent">
+      <label for="edit-urgent">Срочно</label>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel-btn" onclick="closeTaskEditor()">Отмена</button>
+      <button class="save-btn" onclick="saveTaskEdit()">Сохранить</button>
+    </div>
+  </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPA_URL='https://apijeywkwtjezgeuhkhm.supabase.co';
@@ -112,7 +144,7 @@ const PROJECTS=[
   {id:'fencing',name:'Не тот Королёв',color:'#30d158'},
   {id:'china',name:'Маркетплейсы',color:'#bf5af2'},
   {id:'istra',name:'Помещение Истра',color:'#888'},
-  {id:'tma',name:'Telegram Mini Apps',color:'#5ac8fa'},
+  {id:'tma',name:'AI / TMA / разработка',color:'#5ac8fa'},
   {id:'health',name:'Пётр Михайлович',color:'#ff375f'},
   {id:'personal',name:'Личное',color:'#aaa'},
   {id:'other',name:'Разное',color:'#666'},
@@ -233,37 +265,34 @@ async function deleteTask(id){
   tasks=tasks.filter(t=>t.id!==id);
   renderAll();
 }
-async function setTaskDate(id,date){
-  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({due_date:date})});
-  const t=tasks.find(x=>x.id===id);
-  if(t)t.due_date=date;
-  renderAll();
-}
-function pickTaskDate(id){
+let editingTaskId=null;
+function openTaskEditor(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
-  const input=document.createElement('input');
-  input.type='date';
-  if(t.due_date)input.value=t.due_date;
-  input.style.position='fixed';
-  input.style.left='-1000px';
-  input.style.opacity='0';
-  document.body.appendChild(input);
-  input.addEventListener('change',()=>{
-    if(input.value)setTaskDate(id,input.value);
-    input.remove();
-  });
-  input.addEventListener('blur',()=>input.remove());
-  if(input.showPicker)input.showPicker();
-  else input.focus();
+  editingTaskId=id;
+  document.getElementById('edit-text').value=t.text||'';
+  document.getElementById('edit-project').value=t.project||'other';
+  document.getElementById('edit-date').value=t.due_date||'';
+  document.getElementById('edit-urgent').checked=!!t.urgent;
+  document.getElementById('edit-overlay').classList.add('active');
 }
-async function editTask(id){
-  const t=tasks.find(x=>x.id===id);if(!t)return;
-  const newText=prompt('Текст задачи:',t.text);
-  if(newText===null)return;
-  const trimmed=newText.trim();
-  if(!trimmed)return;
-  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({text:trimmed})});
-  t.text=trimmed;
+function closeTaskEditor(){
+  editingTaskId=null;
+  document.getElementById('edit-overlay').classList.remove('active');
+}
+async function saveTaskEdit(){
+  if(editingTaskId===null)return;
+  const text=document.getElementById('edit-text').value.trim();
+  if(!text){alert('Текст задачи не может быть пустым');return;}
+  const patch={
+    text,
+    project:document.getElementById('edit-project').value,
+    due_date:document.getElementById('edit-date').value||null,
+    urgent:document.getElementById('edit-urgent').checked
+  };
+  await dbFetch('tasks?id=eq.'+editingTaskId,{method:'PATCH',body:JSON.stringify(patch)});
+  const t=tasks.find(x=>x.id===editingTaskId);
+  if(t)Object.assign(t,patch);
+  closeTaskEditor();
   renderAll();
 }
 function makeTaskEl(t){
@@ -285,9 +314,7 @@ function makeTaskEl(t){
         <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
       </div>
       <div class="task-actions">
-        <button class="task-action-btn" onclick="editTask(${t.id})">Редактировать</button>
-        <button class="task-action-btn" onclick="pickTaskDate(${t.id})">Дата</button>
-        <button class="task-action-btn" onclick="setTaskDate(${t.id},null)">Без даты</button>
+        <button class="task-action-btn" onclick="openTaskEditor(${t.id})">Редактировать</button>
         <button class="task-action-btn danger" onclick="deleteTask(${t.id})">Удалить</button>
       </div>
     </div>`;
@@ -343,6 +370,7 @@ function switchTabByName(name){
   const idx=views.indexOf(name);
   if(idx>=0){tabs.forEach(t=>t.classList.remove('active'));document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));tabs[idx].classList.add('active');document.getElementById('view-'+name).classList.add('active');}
 }
+document.getElementById('edit-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
 document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))sendMsg();});
 document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 const d=new Date();
