@@ -29,6 +29,8 @@ textarea::placeholder{color:#555}
 .section-label{font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
 .task-card{background:#1c1c1e;border-radius:12px;margin-bottom:8px;overflow:hidden}
 .task-card.dragging{opacity:0.4}
+.task-card.overdue{border:1px solid rgba(255,69,58,0.35);background:#221616}
+.badge.date.overdue{background:#3a1a1a;color:#ff453a}
 .board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
 .board-col{background:#1c1c1e;border-radius:12px;min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column}
 .board-col.drag-over{outline:2px dashed #1a56db}
@@ -179,14 +181,24 @@ const EFFORT_OPTIONS=[
   {id:'elephant',name:'Слон'},
 ];
 const STATUS_OPTIONS=[
-  {id:'inbox',name:'Inbox'},
-  {id:'next',name:'Далее'},
+  {id:'inbox',name:'Входящие'},
+  {id:'next',name:'Без даты'},
   {id:'scheduled',name:'Запланировано'},
-  {id:'waiting',name:'Ожидание'},
+  {id:'doing',name:'В работе'},
+  {id:'waiting',name:'Ожидаю'},
   {id:'someday',name:'Когда-нибудь'},
   {id:'done',name:'Готово'},
 ];
 const STATUS_LABELS=Object.fromEntries(STATUS_OPTIONS.map(o=>[o.id,o.name]));
+const BOARD_COLUMNS=[
+  {status:'inbox',    name:'Входящие',     match:t=>!t.done&&(t.status||'next')==='inbox'},
+  {status:'next',     name:'Без даты',     match:t=>!t.done&&(t.status||'next')==='next'&&!t.due_date},
+  {status:'scheduled',name:'Запланировано',match:t=>!t.done&&(t.status==='scheduled'||((t.status||'next')==='next'&&t.due_date))},
+  {status:'doing',    name:'В работе',     match:t=>!t.done&&t.status==='doing'},
+  {status:'waiting',  name:'Ожидаю',       match:t=>!t.done&&t.status==='waiting'},
+  {status:'someday',  name:'Когда-нибудь', match:t=>!t.done&&t.status==='someday'},
+  {status:'done',     name:'Готово',       match:t=>t.done||t.status==='done'},
+];
 const supabaseClient=supabase.createClient(SUPA_URL,SUPA_KEY);
 let tasks=[];
 async function dbFetch(path,opts={}){
@@ -352,7 +364,9 @@ function makeTaskEl(t,draggable){
   else if(t.effort==='elephant')effortLabel='🐘';
   else if(t.effort)effortLabel=t.effort;
   const statusLabel=(t.status&&t.status!=='next')?STATUS_LABELS[t.status]:null;
-  const card=document.createElement('div');card.className='task-card';
+  const todayISO=new Date().toISOString().split('T')[0];
+  const isOverdue=!t.done&&t.due_date&&t.due_date<todayISO;
+  const card=document.createElement('div');card.className='task-card'+(isOverdue?' overdue':'');
   const main=document.createElement('div');main.className='task-main';
   main.innerHTML=`
     <div class="check${t.done?' done':''}" onclick="toggleTask(${t.id})">
@@ -366,7 +380,7 @@ function makeTaskEl(t,draggable){
         ${t.important?'<span class="badge important">важно</span>':''}
         ${isUrgent?'<span class="badge urgent">срочно</span>':''}
         ${effortLabel?`<span class="badge effort">${effortLabel}</span>`:''}
-        ${ds?`<span class="badge date">${ds}</span>`:''}
+        ${ds?`<span class="badge date${isOverdue?' overdue':''}">${ds}</span>`:''}
         ${statusLabel?`<span class="badge status">${statusLabel}</span>`:''}
         <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
       </div>
@@ -413,16 +427,16 @@ function renderProjects(){
 }
 async function moveTaskToStatus(id,status){
   const t=tasks.find(x=>x.id===id);if(!t)return;
-  const done=status==='done';
-  const patch={status,done};
+  const patch={status,done:status==='done'};
+  if(status==='next')patch.due_date=null;
   await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch)});
   Object.assign(t,patch);
   renderAll();
 }
 function renderBoard(){
   const c=document.getElementById('board-content');c.innerHTML='';
-  STATUS_OPTIONS.forEach(col=>{
-    const colTasks=tasks.filter(t=>(t.status||'next')===col.id);
+  BOARD_COLUMNS.forEach(col=>{
+    const colTasks=tasks.filter(col.match);
     const colEl=document.createElement('div');colEl.className='board-col';
     const header=document.createElement('div');header.className='board-col-header';
     header.innerHTML=`<span>${col.name}</span><span class="board-col-count">${colTasks.length}</span>`;
@@ -436,7 +450,7 @@ function renderBoard(){
       e.preventDefault();
       colEl.classList.remove('drag-over');
       const id=Number(e.dataTransfer.getData('text/plain'));
-      if(id)moveTaskToStatus(id,col.id);
+      if(id)moveTaskToStatus(id,col.status);
     });
     c.appendChild(colEl);
   });
