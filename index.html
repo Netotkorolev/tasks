@@ -139,6 +139,8 @@ textarea::placeholder{color:var(--text-tertiary)}
 .modal-actions button{flex:1;padding:12px;border-radius:var(--r-md);border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .modal-actions .save-btn{background:var(--accent);color:#fff}
 .modal-actions .cancel-btn{background:var(--surface-2);color:var(--text-secondary)}
+.fab{position:fixed;right:calc(16px + env(safe-area-inset-right));bottom:calc(86px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:28px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:120;touch-action:manipulation;font-family:inherit}
+.fab:active{opacity:0.85}
 @media (max-width:480px){
   .task-main{padding:9px 32px 9px 11px;gap:10px}
   .board-col{min-width:85vw;flex:0 0 85vw}
@@ -208,6 +210,36 @@ textarea::placeholder{color:var(--text-tertiary)}
 </div>
 <div class="view" id="view-projects"><div id="proj-content"></div></div>
 <div class="view" id="view-done"><div id="done-content"></div></div>
+<button class="fab" onclick="openCreateTaskModal()" aria-label="Добавить задачу">+</button>
+</div>
+<div class="modal-overlay" id="create-overlay">
+  <div class="modal-box">
+    <h3>Новая задача</h3>
+    <label class="field-label" for="create-text">Название задачи</label>
+    <textarea id="create-text" rows="2"></textarea>
+    <label class="field-label" for="create-notes">Заметки</label>
+    <textarea id="create-notes" rows="2"></textarea>
+    <label class="field-label" for="create-project">Проект</label>
+    <select id="create-project"></select>
+    <label class="field-label" for="create-date">Дата</label>
+    <input type="date" id="create-date">
+    <label class="field-label" for="create-effort">Объём</label>
+    <select id="create-effort"></select>
+    <label class="field-label" for="create-status">Статус</label>
+    <select id="create-status"></select>
+    <div class="checkbox-row">
+      <input type="checkbox" id="create-urgent">
+      <label for="create-urgent">Срочно</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="create-important">
+      <label for="create-important">Важно</label>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel-btn" onclick="closeCreateTaskModal()">Отмена</button>
+      <button class="save-btn" onclick="createTask()">Создать</button>
+    </div>
+  </div>
 </div>
 <div class="modal-overlay" id="edit-overlay">
   <div class="modal-box">
@@ -447,6 +479,39 @@ async function saveTaskEdit(){
   const t=tasks.find(x=>x.id===editingTaskId);
   if(t)Object.assign(t,patch);
   closeTaskEditor();
+  renderAll();
+}
+function openCreateTaskModal(){
+  document.getElementById('create-text').value='';
+  document.getElementById('create-notes').value='';
+  document.getElementById('create-project').value='personal';
+  document.getElementById('create-date').value='';
+  document.getElementById('create-effort').value='';
+  document.getElementById('create-status').value='next';
+  document.getElementById('create-urgent').checked=false;
+  document.getElementById('create-important').checked=false;
+  document.getElementById('create-overlay').classList.add('active');
+}
+function closeCreateTaskModal(){
+  document.getElementById('create-overlay').classList.remove('active');
+}
+async function createTask(){
+  const text=document.getElementById('create-text').value.trim();
+  if(!text){alert('Текст задачи не может быть пустым');return;}
+  const payload={
+    text,
+    notes:document.getElementById('create-notes').value.trim()||null,
+    project:document.getElementById('create-project').value,
+    due_date:document.getElementById('create-date').value||null,
+    effort:document.getElementById('create-effort').value||null,
+    status:document.getElementById('create-status').value||'next',
+    urgent:document.getElementById('create-urgent').checked,
+    important:document.getElementById('create-important').checked,
+    done:false
+  };
+  const created=await dbFetch('tasks',{method:'POST',body:JSON.stringify(payload)});
+  if(Array.isArray(created)&&created.length)tasks.unshift(created[0]);
+  closeCreateTaskModal();
   renderAll();
 }
 function makeTaskEl(t,draggable){
@@ -758,6 +823,9 @@ function closeDrawer(){
 document.getElementById('edit-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
 document.getElementById('edit-effort').innerHTML=EFFORT_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.getElementById('edit-status').innerHTML=STATUS_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
+document.getElementById('create-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+document.getElementById('create-effort').innerHTML=EFFORT_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
+document.getElementById('create-status').innerHTML=STATUS_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.addEventListener('click',closeAllTaskMenus);
 document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))sendMsg();});
 document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
