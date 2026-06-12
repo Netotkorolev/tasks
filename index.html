@@ -48,6 +48,11 @@ header p{font-size:12px;color:var(--text-secondary);margin-top:2px}
 .drawer-item{display:flex;align-items:center;width:100%;min-height:44px;text-align:left;padding:0 14px;font-size:15px;font-weight:500;color:var(--text-secondary);background:none;border:none;border-radius:var(--r-md);cursor:pointer;touch-action:manipulation;font-family:inherit}
 .drawer-item.active{background:var(--accent-soft);color:var(--text)}
 .drawer-footer{padding:var(--sp-2);border-top:1px solid var(--border)}
+.drawer-divider{height:1px;background:var(--border);margin:8px 8px}
+.drawer-section-label{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;padding:10px 14px 4px}
+.drawer-project{gap:10px}
+.drawer-project-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drawer-project-count{font-size:11px;color:var(--text-secondary);background:var(--surface-2);border-radius:var(--r-sm);padding:1px 7px;flex-shrink:0}
 .view{display:none;padding:var(--sp-3) var(--sp-4) calc(env(safe-area-inset-bottom) + 110px)}
 .view.active{display:block}
 .chat-box{background:var(--surface);border-radius:var(--r-lg);padding:14px;margin-bottom:12px;min-height:60px}
@@ -112,6 +117,8 @@ textarea::placeholder{color:var(--text-tertiary)}
 .filter-chips{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto}
 .chip{flex-shrink:0;padding:8px 14px;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .chip.active{background:var(--accent-soft);color:var(--text);border-color:var(--accent)}
+.project-filter-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--r-lg);background:var(--accent-soft);color:var(--text);font-size:13px;font-weight:500;margin-bottom:12px}
+.project-filter-chip button{background:none;border:none;color:var(--text-secondary);font-size:15px;cursor:pointer;font-family:inherit;line-height:1;padding:0;touch-action:manipulation}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
 .login-box{background:var(--surface);border-radius:var(--r-lg);padding:24px;width:100%;max-width:360px}
 .login-box h2{font-size:20px;margin-bottom:16px;text-align:center}
@@ -159,8 +166,11 @@ textarea::placeholder{color:var(--text-tertiary)}
     <button class="drawer-item active" data-view="secretary" onclick="setView('secretary')">Секретарь</button>
     <button class="drawer-item" data-view="today" onclick="setView('today')">Сегодня</button>
     <button class="drawer-item" data-view="board" onclick="setView('board')">Доска</button>
-    <button class="drawer-item" data-view="alltasks" onclick="setView('alltasks')">Все задачи</button>
+    <button class="drawer-item" data-view="alltasks" onclick="openAllTasksView()">Все задачи</button>
     <button class="drawer-item" data-view="done" onclick="setView('done')">Выполнено</button>
+    <div class="drawer-divider"></div>
+    <div class="drawer-section-label">Проекты</div>
+    <div id="drawer-projects"></div>
   </div>
   <div class="drawer-footer">
     <button class="drawer-item" onclick="logout()">Выйти</button>
@@ -184,6 +194,11 @@ textarea::placeholder{color:var(--text-tertiary)}
 <div class="view" id="view-today"><div id="today-content"></div></div>
 <div class="view" id="view-board"><div class="board" id="board-content"></div></div>
 <div class="view" id="view-alltasks">
+  <div class="project-filter-chip" id="alltasks-project-chip" style="display:none">
+    <span class="proj-dot" id="alltasks-project-dot"></span>
+    <span id="alltasks-project-name"></span>
+    <button onclick="clearAllTasksProjectFilter()" aria-label="Сбросить фильтр проекта">×</button>
+  </div>
   <div class="filter-chips" id="alltasks-filters">
     <button class="chip" data-filter="all" onclick="setAllTasksFilter('all')">Все</button>
     <button class="chip" data-filter="dated" onclick="setAllTasksFilter('dated')">С датой</button>
@@ -634,16 +649,42 @@ function renderDone(){
   done.forEach(t=>c.appendChild(makeTaskEl(t)));
 }
 let allTasksFilter='all';
+let allTasksProjectFilter=null;
 function setAllTasksFilter(f){
   allTasksFilter=f;
   renderAllTasks();
+}
+function openProjectFilter(projectId){
+  allTasksProjectFilter=projectId;
+  setView('alltasks');
+  renderAllTasks();
+}
+function openAllTasksView(){
+  allTasksProjectFilter=null;
+  setView('alltasks');
+  renderAllTasks();
+}
+function clearAllTasksProjectFilter(){
+  allTasksProjectFilter=null;
+  renderAllTasks();
+  updateHeader('alltasks');
 }
 function renderAllTasks(){
   document.querySelectorAll('#alltasks-filters .chip').forEach(b=>{
     b.classList.toggle('active',b.dataset.filter===allTasksFilter);
   });
+  const projectChip=document.getElementById('alltasks-project-chip');
+  const proj=allTasksProjectFilter?PROJECTS.find(p=>p.id===allTasksProjectFilter):null;
+  if(proj){
+    projectChip.style.display='';
+    document.getElementById('alltasks-project-dot').style.background=proj.color;
+    document.getElementById('alltasks-project-name').textContent=proj.name;
+  }else{
+    projectChip.style.display='none';
+  }
   const c=document.getElementById('alltasks-content');c.innerHTML='';
-  const active=tasks.filter(t=>!t.done&&t.status!=='done');
+  let active=tasks.filter(t=>!t.done&&t.status!=='done');
+  if(proj)active=active.filter(t=>t.project===proj.id);
   const byDate=(a,b)=>a.due_date<b.due_date?-1:a.due_date>b.due_date?1:0;
   let list;
   if(allTasksFilter==='dated'){
@@ -658,7 +699,18 @@ function renderAllTasks(){
   if(!list.length){c.innerHTML='<div class="empty">Задач нет</div>';return;}
   list.forEach(t=>c.appendChild(makeTaskEl(t)));
 }
-function renderAll(){renderToday();renderBoard();renderProjects();renderDone();renderAllTasks();}
+function renderDrawerProjects(){
+  const c=document.getElementById('drawer-projects');c.innerHTML='';
+  PROJECTS.forEach(proj=>{
+    const count=tasks.filter(t=>t.project===proj.id&&!t.done&&t.status!=='done').length;
+    const btn=document.createElement('button');
+    btn.className='drawer-item drawer-project';
+    btn.onclick=()=>openProjectFilter(proj.id);
+    btn.innerHTML=`<span class="proj-dot" style="background:${proj.color}"></span><span class="drawer-project-name">${proj.name}</span><span class="drawer-project-count">${count}</span>`;
+    c.appendChild(btn);
+  });
+}
+function renderAll(){renderToday();renderBoard();renderProjects();renderDone();renderAllTasks();renderDrawerProjects();}
 const VIEW_HEADERS={
   secretary:{title:'Секретарь',subtitle:'AI-помощник по задачам'},
   today:{title:'Сегодня',subtitle:null},
@@ -674,7 +726,12 @@ function updateHeader(name){
   const info=VIEW_HEADERS[name];
   if(!info)return;
   document.getElementById('header-title').textContent=info.title;
-  document.getElementById('header-subtitle').textContent=info.subtitle||todayDateLabel();
+  let subtitle=info.subtitle||todayDateLabel();
+  if(name==='alltasks'&&allTasksProjectFilter){
+    const proj=PROJECTS.find(p=>p.id===allTasksProjectFilter);
+    if(proj)subtitle='проект: '+proj.name;
+  }
+  document.getElementById('header-subtitle').textContent=subtitle;
 }
 function setView(name){
   const view=document.getElementById('view-'+name);
