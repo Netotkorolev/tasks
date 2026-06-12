@@ -6,15 +6,15 @@
 <title>Задачи — Егор</title>
 <style>
 :root{
-  --bg:#0d0d0f;
-  --surface:#1c1c1e;
-  --surface-2:#2c2c2e;
-  --border:#2c2c2e;
-  --text:#f5f5f5;
-  --text-secondary:#8e8e93;
-  --text-tertiary:#636366;
-  --accent:#0A84FF;
-  --accent-soft:rgba(10,132,255,0.15);
+  --bg:#101820;
+  --surface:#182330;
+  --surface-2:#223044;
+  --border:#2E3D52;
+  --text:#F4F7FB;
+  --text-secondary:#AAB4C0;
+  --text-tertiary:#6F7D8C;
+  --accent:#4DA3FF;
+  --accent-soft:rgba(77,163,255,0.15);
   --red:#ff453a;
   --yellow:#ffd60a;
   --green:#30d158;
@@ -44,7 +44,7 @@ header p{font-size:12px;color:var(--text-secondary);margin-top:2px}
 .msg.bot{background:var(--surface-2);color:var(--text)}
 .msg.loading{background:var(--surface-2);color:var(--text-secondary);font-style:italic}
 textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px;font-size:16px;line-height:1.4;color:var(--text);resize:vertical;min-height:140px;font-family:inherit}
-textarea:focus{outline:none;border-color:#444}
+textarea:focus{outline:none;border-color:var(--accent)}
 textarea::placeholder{color:var(--text-tertiary)}
 .send-btn{width:100%;margin-top:8px;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-lg);font-size:15px;font-weight:600;cursor:pointer;touch-action:manipulation}
 .send-btn:active{opacity:0.85}
@@ -63,7 +63,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .board-col-tasks .task-card{margin-bottom:8px}
 .board-col-tasks .task-card:last-child{margin-bottom:0}
 .task-main{display:flex;align-items:flex-start;gap:12px;padding:13px 34px 13px 13px}
-.check{width:22px;height:22px;border-radius:50%;border:2px solid #444;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px;transition:all 0.15s;position:relative;touch-action:manipulation}
+.check{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-top:1px;transition:all 0.15s;position:relative;touch-action:manipulation}
 .check::after{content:'';position:absolute;top:50%;left:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
 .check.done{background:var(--accent);border-color:var(--accent)}
 .check svg{display:none}
@@ -85,7 +85,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .task-menu{display:none;position:absolute;top:32px;right:6px;background:var(--surface-2);border-radius:var(--r-md);overflow:hidden;z-index:10;min-width:130px;box-shadow:0 4px 16px rgba(0,0,0,0.4)}
 .task-menu.open{display:block}
 .task-menu button{display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px;background:none;border:none;color:var(--text);cursor:pointer;font-family:inherit;touch-action:manipulation}
-.task-menu button:active{background:#3a3a3c}
+.task-menu button:active{background:var(--surface-2)}
 .task-menu button.danger{color:var(--red)}
 .proj-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:12px;padding:14px}
 .proj-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -101,7 +101,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .login-box{background:var(--surface);border-radius:var(--r-lg);padding:24px;width:100%;max-width:360px}
 .login-box h2{font-size:20px;margin-bottom:16px;text-align:center}
 .login-box input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-size:14px;color:var(--text);margin-bottom:10px;font-family:inherit}
-.login-box input:focus{outline:none;border-color:#444}
+.login-box input:focus{outline:none;border-color:var(--accent)}
 .login-error{color:var(--red);font-size:13px;margin-top:8px;text-align:center;min-height:16px}
 .header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .logout-btn{background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:12px;padding:6px 12px;border-radius:var(--r-sm);cursor:pointer;flex-shrink:0;touch-action:manipulation}
@@ -111,7 +111,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .modal-box h3{font-size:16px;margin-bottom:14px}
 .field-label{font-size:12px;color:var(--text-secondary);margin:10px 0 5px;display:block}
 .modal-box input[type=text],.modal-box input[type=date],.modal-box select,.modal-box textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-md);padding:11px;font-size:14px;color:var(--text);font-family:inherit}
-.modal-box input:focus,.modal-box select:focus,.modal-box textarea:focus{outline:none;border-color:#444}
+.modal-box input:focus,.modal-box select:focus,.modal-box textarea:focus{outline:none;border-color:var(--accent)}
 .checkbox-row{display:flex;align-items:center;gap:8px;margin-top:12px}
 .checkbox-row input{width:auto}
 .modal-actions{display:flex;gap:8px;margin-top:18px}
