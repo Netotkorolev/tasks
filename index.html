@@ -52,9 +52,9 @@ textarea::placeholder{color:var(--text-tertiary)}
 .section-label{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
 .task-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:8px;overflow:hidden;position:relative}
 .task-card.dragging{opacity:0.4}
-.task-card.overdue{border:1px solid rgba(255,69,58,0.35);background:#221616}
+.task-card.urgent{box-shadow:inset 3px 0 0 var(--red)}
 .task-card.frog{border:1px solid rgba(191,90,242,0.4);background:rgba(191,90,242,0.08)}
-.badge.date.overdue{background:#3a1a1a;color:var(--red)}
+.frog-reason{font-size:12px;color:var(--purple);font-weight:500;margin-top:4px}
 .board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scroll-snap-type:x mandatory;overscroll-behavior:contain}
 .board-col{background:var(--surface);border-radius:var(--r-lg);min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column;scroll-snap-align:start}
 .board-col.drag-over{outline:2px dashed var(--accent);background:var(--accent-soft)}
@@ -72,11 +72,11 @@ textarea::placeholder{color:var(--text-tertiary)}
 .task-text{font-size:16px;line-height:1.4;color:var(--text)}
 .task-text.done{text-decoration:line-through;opacity:0.4}
 .task-desc{font-size:12px;color:var(--text-secondary);margin-top:3px}
-.task-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.badge{font-size:10px;padding:1px 6px;border-radius:var(--r-sm);font-weight:500;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.badge.urgent{background:#3a1a1a;color:var(--red)}
-.badge.important{background:#2a2410;color:var(--yellow)}
-.badge.date,.badge.effort,.badge.status{background:var(--surface-2);color:var(--text-secondary)}
+.imp-star{color:var(--yellow);margin-right:2px}
+.task-meta{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:6px;font-size:12px;color:var(--text-secondary)}
+.task-meta .meta-overdue{color:var(--red)}
+.task-meta .meta-sep{color:var(--text-tertiary)}
+.task-meta .proj-dot{width:7px;height:7px;flex-shrink:0}
 .task-notes{font-size:12px;color:var(--text-secondary);margin-top:3px;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .task-menu-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border:none;background:transparent;color:var(--text-secondary);font-size:18px;line-height:1;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;touch-action:manipulation}
 .task-menu-btn::after{content:'';position:absolute;top:50%;left:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
@@ -203,7 +203,7 @@ const PROJECTS=[
   {id:'istra',name:'Помещение Истра',color:'#888'},
   {id:'tma',name:'AI / TMA / разработка',color:'#5ac8fa'},
   {id:'health',name:'Пётр Михайлович',color:'#ff375f'},
-  {id:'personal',name:'Личное',color:'#aaa'},
+  {id:'personal',name:'Личное',color:'#00c7be'},
   {id:'other',name:'Разное',color:'#666'},
 ];
 const EFFORT_OPTIONS=[
@@ -405,31 +405,25 @@ function makeTaskEl(t,draggable){
   const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
   const ds=fmtDate(t.due_date);
   const isUrgent=t.urgent||(t.due_date&&new Date(t.due_date+'T00:00:00')<=new Date());
-  let effortLabel='';
-  if(t.effort==='2m'||t.effort==='5m')effortLabel='⚡ '+t.effort;
-  else if(t.effort==='elephant')effortLabel='🐘';
-  else if(t.effort)effortLabel=t.effort;
-  const statusLabel=(t.status&&t.status!=='next')?STATUS_LABELS[t.status]:null;
+  const effortOpt=EFFORT_OPTIONS.find(o=>o.id===t.effort);
+  const effortName=(t.effort&&effortOpt)?effortOpt.name:'';
   const todayISO=new Date().toISOString().split('T')[0];
   const isOverdue=!t.done&&t.due_date&&t.due_date<todayISO;
-  const card=document.createElement('div');card.className='task-card'+(isOverdue?' overdue':'');
+  const card=document.createElement('div');card.className='task-card'+(isUrgent?' urgent':'');
   const main=document.createElement('div');main.className='task-main';
+  const metaParts=[];
+  if(ds)metaParts.push(isOverdue?`<span class="meta-overdue">${ds}</span>`:ds);
+  if(effortName)metaParts.push(effortName);
+  metaParts.push(`<span class="proj-dot" style="background:${proj.color}"></span>${proj.name}`);
   main.innerHTML=`
     <div class="check${t.done?' done':''}" onclick="toggleTask(${t.id})">
       <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <div class="task-body">
-      <div class="task-text${t.done?' done':''}">${t.text}</div>
+      <div class="task-text${t.done?' done':''}">${t.important?'<span class="imp-star">★</span> ':''}${t.text}</div>
       ${t.desc?`<div class="task-desc">${t.desc}</div>`:''}
       ${t.notes?`<div class="task-notes">${t.notes}</div>`:''}
-      <div class="task-badges">
-        ${t.important?'<span class="badge important">важно</span>':''}
-        ${isUrgent?'<span class="badge urgent">срочно</span>':''}
-        ${effortLabel?`<span class="badge effort">${effortLabel}</span>`:''}
-        ${ds?`<span class="badge date${isOverdue?' overdue':''}">${ds}</span>`:''}
-        ${statusLabel?`<span class="badge status">${statusLabel}</span>`:''}
-        <span class="badge" style="background:${proj.color}33;color:${proj.color}">${proj.name}</span>
-      </div>
+      <div class="task-meta">${metaParts.join('<span class="meta-sep"> · </span>')}</div>
     </div>
     <button class="task-menu-btn" onclick="toggleTaskMenu(event,this)">⋯</button>
     <div class="task-menu">
@@ -496,7 +490,17 @@ function renderToday(){
   }else{
     if(frog){
       const l=document.createElement('div');l.className='section-label';l.textContent='🐸 Съешь лягушку';c.appendChild(l);
-      const card=makeTaskEl(frog);card.classList.add('frog');c.appendChild(card);
+      const card=makeTaskEl(frog);card.classList.add('frog');
+      const reason=document.createElement('div');reason.className='frog-reason';
+      if(frog.effort==='elephant'){
+        reason.textContent='🐸 Главная задача дня · большая задача';
+      }else{
+        const opt=EFFORT_OPTIONS.find(o=>o.id===frog.effort);
+        const effortName=(frog.effort&&opt)?opt.name:'';
+        reason.textContent='🐸 Главная задача дня · важно'+(effortName?' · '+effortName:'');
+      }
+      card.querySelector('.task-text').insertAdjacentElement('afterend',reason);
+      c.appendChild(card);
     }
     if(lightningShown.length){
       const l=document.createElement('div');l.className='section-label';l.textContent='⚡ Молнии';c.appendChild(l);
