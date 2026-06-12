@@ -109,6 +109,9 @@ textarea::placeholder{color:var(--text-tertiary)}
 .empty{text-align:center;color:var(--text-tertiary);font-size:14px;padding:30px 0}
 .more-link{display:block;width:100%;text-align:center;background:none;border:none;color:var(--accent);font-size:13px;font-weight:500;padding:10px;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .today-indicator{margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;font-size:12px;color:var(--text-secondary);text-align:center;cursor:pointer;touch-action:manipulation}
+.filter-chips{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto}
+.chip{flex-shrink:0;padding:8px 14px;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.chip.active{background:var(--accent-soft);color:var(--text);border-color:var(--accent)}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
 .login-box{background:var(--surface);border-radius:var(--r-lg);padding:24px;width:100%;max-width:360px}
 .login-box h2{font-size:20px;margin-bottom:16px;text-align:center}
@@ -156,7 +159,7 @@ textarea::placeholder{color:var(--text-tertiary)}
     <button class="drawer-item active" data-view="secretary" onclick="setView('secretary')">Секретарь</button>
     <button class="drawer-item" data-view="today" onclick="setView('today')">Сегодня</button>
     <button class="drawer-item" data-view="board" onclick="setView('board')">Доска</button>
-    <button class="drawer-item" data-view="projects" onclick="setView('projects')">Проекты</button>
+    <button class="drawer-item" data-view="alltasks" onclick="setView('alltasks')">Все задачи</button>
     <button class="drawer-item" data-view="done" onclick="setView('done')">Выполнено</button>
   </div>
   <div class="drawer-footer">
@@ -180,6 +183,14 @@ textarea::placeholder{color:var(--text-tertiary)}
 </div>
 <div class="view" id="view-today"><div id="today-content"></div></div>
 <div class="view" id="view-board"><div class="board" id="board-content"></div></div>
+<div class="view" id="view-alltasks">
+  <div class="filter-chips" id="alltasks-filters">
+    <button class="chip" data-filter="all" onclick="setAllTasksFilter('all')">Все</button>
+    <button class="chip" data-filter="dated" onclick="setAllTasksFilter('dated')">С датой</button>
+    <button class="chip" data-filter="undated" onclick="setAllTasksFilter('undated')">Без даты</button>
+  </div>
+  <div id="alltasks-content"></div>
+</div>
 <div class="view" id="view-projects"><div id="proj-content"></div></div>
 <div class="view" id="view-done"><div id="done-content"></div></div>
 </div>
@@ -622,11 +633,37 @@ function renderDone(){
   if(!done.length){c.innerHTML='<div class="empty">Пока ничего не выполнено</div>';return;}
   done.forEach(t=>c.appendChild(makeTaskEl(t)));
 }
-function renderAll(){renderToday();renderBoard();renderProjects();renderDone();}
+let allTasksFilter='all';
+function setAllTasksFilter(f){
+  allTasksFilter=f;
+  renderAllTasks();
+}
+function renderAllTasks(){
+  document.querySelectorAll('#alltasks-filters .chip').forEach(b=>{
+    b.classList.toggle('active',b.dataset.filter===allTasksFilter);
+  });
+  const c=document.getElementById('alltasks-content');c.innerHTML='';
+  const active=tasks.filter(t=>!t.done&&t.status!=='done');
+  const byDate=(a,b)=>a.due_date<b.due_date?-1:a.due_date>b.due_date?1:0;
+  let list;
+  if(allTasksFilter==='dated'){
+    list=active.filter(t=>t.due_date).sort(byDate);
+  }else if(allTasksFilter==='undated'){
+    list=active.filter(t=>!t.due_date);
+  }else{
+    const dated=active.filter(t=>t.due_date).sort(byDate);
+    const undated=active.filter(t=>!t.due_date);
+    list=dated.concat(undated);
+  }
+  if(!list.length){c.innerHTML='<div class="empty">Задач нет</div>';return;}
+  list.forEach(t=>c.appendChild(makeTaskEl(t)));
+}
+function renderAll(){renderToday();renderBoard();renderProjects();renderDone();renderAllTasks();}
 const VIEW_HEADERS={
   secretary:{title:'Секретарь',subtitle:'AI-помощник по задачам'},
   today:{title:'Сегодня',subtitle:null},
   board:{title:'Доска',subtitle:'статусы и очередь задач'},
+  alltasks:{title:'Все задачи',subtitle:'общий список активных задач'},
   projects:{title:'Проекты',subtitle:'обзор по направлениям'},
   done:{title:'Выполнено',subtitle:'закрытые задачи'}
 };
