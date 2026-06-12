@@ -53,6 +53,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .task-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:8px;overflow:hidden;position:relative}
 .task-card.dragging{opacity:0.4}
 .task-card.overdue{border:1px solid rgba(255,69,58,0.35);background:#221616}
+.task-card.frog{border:1px solid rgba(191,90,242,0.4);background:rgba(191,90,242,0.08)}
 .badge.date.overdue{background:#3a1a1a;color:var(--red)}
 .board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scroll-snap-type:x mandatory;overscroll-behavior:contain}
 .board-col{background:var(--surface);border-radius:var(--r-lg);min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column;scroll-snap-align:start}
@@ -93,6 +94,8 @@ textarea::placeholder{color:var(--text-tertiary)}
 .prog-bar{height:4px;background:var(--surface-2);border-radius:2px;margin-bottom:10px;overflow:hidden}
 .prog-fill{height:100%;border-radius:2px}
 .empty{text-align:center;color:var(--text-tertiary);font-size:14px;padding:30px 0}
+.more-link{display:block;width:100%;text-align:center;background:none;border:none;color:var(--accent);font-size:13px;font-weight:500;padding:10px;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.today-indicator{margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 14px;font-size:12px;color:var(--text-secondary);text-align:center;cursor:pointer;touch-action:manipulation}
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
 .login-box{background:var(--surface);border-radius:var(--r-lg);padding:24px;width:100%;max-width:360px}
 .login-box h2{font-size:20px;margin-bottom:16px;text-align:center}
@@ -445,16 +448,103 @@ function makeTaskEl(t,draggable){
   }
   return card;
 }
+let todayShowAllLightning=false;
+let todayShowAllRest=false;
 function renderToday(){
   const c=document.getElementById('today-content');c.innerHTML='';
-  const todayISO=new Date().toISOString().split('T')[0];
-  const urgent=tasks.filter(t=>!t.done&&(t.urgent||(t.due_date&&t.due_date<=todayISO)));
-  const rest=tasks.filter(t=>!t.done&&!t.urgent&&(!t.due_date||t.due_date>todayISO)).slice(0,15);
+  const now=new Date();
+  const todayISO=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const st=t=>t.status||'next';
+  const isActive=t=>!t.done&&st(t)!=='done';
+  const activeStatuses=['next','scheduled','doing'];
+  const dueOk=t=>!t.due_date||t.due_date<=todayISO||st(t)==='doing';
+  const shownIds=new Set();
+
+  // 1. Лягушка
+  const frogCandidates=tasks.filter(t=>isActive(t)&&t.important&&activeStatuses.includes(st(t))&&dueOk(t));
+  let frog=frogCandidates.find(t=>['elephant','60m','30m'].includes(t.effort));
+  if(!frog)frog=frogCandidates.find(t=>t.effort==='15m'||!t.effort);
+  if(frog)shownIds.add(frog.id);
+
+  // 2. Молнии
+  const lightningAll=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&(t.effort==='2m'||t.effort==='5m')&&activeStatuses.includes(st(t))&&dueOk(t));
+  lightningAll.forEach(t=>shownIds.add(t.id));
+  const lightningShown=todayShowAllLightning?lightningAll:lightningAll.slice(0,5);
+  const lightningMore=lightningAll.length-lightningShown.length;
+
+  // 3. Кусочек слона
+  const elephant=tasks.find(t=>!shownIds.has(t.id)&&isActive(t)&&t.effort==='elephant'&&activeStatuses.includes(st(t))&&dueOk(t));
+  if(elephant)shownIds.add(elephant.id);
+
+  // 4. Срочно и важно
+  const urgentImportant=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t)&&(t.urgent||(t.due_date&&t.due_date<=todayISO)));
+  urgentImportant.forEach(t=>shownIds.add(t.id));
+
+  // 5. Остальное
+  const restAll=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t));
+  restAll.forEach(t=>shownIds.add(t.id));
+  const restShown=todayShowAllRest?restAll:restAll.slice(0,10);
+  const restMore=restAll.length-restShown.length;
+
+  // 6. Сделано
   const done=tasks.filter(t=>t.done).slice(0,5);
-  if(!urgent.length&&!rest.length){c.innerHTML='<div class="empty">Задач на сегодня нет 🎉</div>';return;}
-  if(urgent.length){const l=document.createElement('div');l.className='section-label';l.textContent='Срочно';c.appendChild(l);urgent.forEach(t=>c.appendChild(makeTaskEl(t)));}
-  if(rest.length){const l=document.createElement('div');l.className='section-label';l.textContent='Остальные';c.appendChild(l);rest.forEach(t=>c.appendChild(makeTaskEl(t)));}
-  if(done.length){const l=document.createElement('div');l.className='section-label';l.textContent='Выполнено';c.appendChild(l);done.forEach(t=>c.appendChild(makeTaskEl(t)));}
+
+  const totalShown=(frog?1:0)+lightningShown.length+(elephant?1:0)+urgentImportant.length+restShown.length;
+
+  if(totalShown===0){
+    const empty=document.createElement('div');empty.className='empty';empty.textContent='Задач на сегодня нет 🎉';c.appendChild(empty);
+  }else{
+    if(frog){
+      const l=document.createElement('div');l.className='section-label';l.textContent='🐸 Съешь лягушку';c.appendChild(l);
+      const card=makeTaskEl(frog);card.classList.add('frog');c.appendChild(card);
+    }
+    if(lightningShown.length){
+      const l=document.createElement('div');l.className='section-label';l.textContent='⚡ Молнии';c.appendChild(l);
+      lightningShown.forEach(t=>c.appendChild(makeTaskEl(t)));
+      if(lightningMore>0){
+        const btn=document.createElement('button');btn.className='more-link';btn.textContent=`ещё ${lightningMore} ⚡`;
+        btn.onclick=()=>{todayShowAllLightning=true;renderToday();};
+        c.appendChild(btn);
+      }
+    }
+    if(elephant){
+      const l=document.createElement('div');l.className='section-label';l.textContent='🐘 Один кусочек слона';c.appendChild(l);
+      c.appendChild(makeTaskEl(elephant));
+    }
+    if(urgentImportant.length){
+      const l=document.createElement('div');l.className='section-label';l.textContent='🔥 Срочно и важно';c.appendChild(l);
+      urgentImportant.forEach(t=>c.appendChild(makeTaskEl(t)));
+    }
+    if(restShown.length){
+      const l=document.createElement('div');l.className='section-label';l.textContent='📋 Остальное';c.appendChild(l);
+      restShown.forEach(t=>c.appendChild(makeTaskEl(t)));
+      if(restMore>0){
+        const btn=document.createElement('button');btn.className='more-link';btn.textContent=`ещё ${restMore}`;
+        btn.onclick=()=>{todayShowAllRest=true;renderToday();};
+        c.appendChild(btn);
+      }
+    }
+  }
+
+  if(done.length){
+    const l=document.createElement('div');l.className='section-label';l.textContent='✅ Сделано';c.appendChild(l);
+    done.forEach(t=>c.appendChild(makeTaskEl(t)));
+  }
+
+  // Индикатор скрытых задач
+  const inboxCount=tasks.filter(t=>isActive(t)&&st(t)==='inbox').length;
+  const waitingCount=tasks.filter(t=>isActive(t)&&st(t)==='waiting').length;
+  const laterCount=tasks.filter(t=>isActive(t)&&t.due_date&&t.due_date>todayISO&&st(t)!=='doing').length;
+  const parts=[];
+  if(inboxCount)parts.push(`Входящие: ${inboxCount}`);
+  if(waitingCount)parts.push(`Ожидаю: ${waitingCount}`);
+  if(laterCount)parts.push(`Позже: ${laterCount}`);
+  if(parts.length){
+    const ind=document.createElement('div');ind.className='today-indicator';
+    ind.textContent=parts.join(' · ')+' → Доска';
+    ind.onclick=()=>switchTabByName('board');
+    c.appendChild(ind);
+  }
 }
 function renderProjects(){
   const c=document.getElementById('proj-content');c.innerHTML='';
