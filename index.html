@@ -145,6 +145,54 @@ textarea::placeholder{color:var(--text-tertiary)}
   .task-main{padding:9px 32px 9px 11px;gap:10px}
   .board-col{min-width:85vw;flex:0 0 85vw}
 }
+/* Secretary chat layout */
+#view-secretary{padding:0}
+#view-secretary.active{display:flex;flex-direction:column;height:calc(100vh - 62px);overflow:hidden}
+#view-secretary.active~.fab{display:none}
+.sec-feed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--sp-3) var(--sp-4);display:flex;flex-direction:column;gap:10px}
+.sec-input-bar{flex-shrink:0;display:flex;align-items:flex-end;gap:8px;padding:10px var(--sp-4) calc(env(safe-area-inset-bottom) + 10px);border-top:1px solid var(--border);background:var(--surface)}
+.sec-input-bar textarea{flex:1;min-height:40px;max-height:120px;resize:none;border-radius:20px;padding:10px 14px;font-size:15px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:inherit;line-height:1.4;overflow-y:auto}
+.sec-input-bar textarea:focus{outline:none;border-color:var(--accent)}
+.sec-send-btn{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation;font-family:inherit}
+.sec-send-btn:active{opacity:0.85}
+.sec-bubble-user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:18px 18px 4px 18px;padding:10px 14px;max-width:80%;font-size:14px;line-height:1.4;word-break:break-word}
+.sec-bubble-bot{align-self:flex-start;width:100%}
+.sec-bubble-label{font-size:11px;color:var(--text-tertiary);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px}
+.sec-bubble-text{font-size:14px;color:var(--text-secondary);line-height:1.4}
+.draft-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.05);transition:opacity 0.15s}
+.draft-card.draft-excluded{opacity:0.4}
+.draft-card-top{display:flex;align-items:flex-start;gap:10px}
+.draft-card-check{flex-shrink:0;margin-top:3px;width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+.draft-card-body{flex:1;min-width:0}
+.draft-text{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:2px 0 4px;font-size:15px;font-weight:500;color:var(--text);font-family:inherit;resize:none;min-height:22px;line-height:1.4;overflow:hidden}
+.draft-text:focus{outline:none;border-bottom-color:var(--accent)}
+.draft-fields{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.draft-fields select,.draft-fields input[type=date]{font-size:12px;padding:4px 7px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2);color:var(--text);font-family:inherit;max-width:150px}
+.draft-toggles{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px}
+.draft-toggles label{display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-secondary)}
+.draft-toggles input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
+.draft-notes{font-size:11px;color:var(--text-tertiary);margin-top:6px;font-style:italic;border-top:1px solid var(--border);padding-top:5px}
+.draft-actions{display:flex;gap:8px;margin-top:2px}
+.draft-confirm-btn{flex:1;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-md);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.draft-confirm-btn:active{opacity:0.85}
+.draft-confirm-btn:disabled{opacity:0.6;cursor:default}
+.draft-cancel-btn{padding:10px 16px;background:var(--surface-2);color:var(--text-secondary);border:none;border-radius:var(--r-md);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.draft-cancel-btn:active{opacity:0.8}
+.draft-select-actions{display:flex;gap:10px;margin-bottom:6px}
+.draft-select-btn{background:none;border:none;color:var(--accent);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;padding:4px 0;touch-action:manipulation}
+.draft-select-btn:active{opacity:0.7}
+.draft-cancelled-label{font-size:12px;color:var(--text-tertiary);margin:4px 0 8px;font-style:italic}
+.draft-restore-actions{display:flex;gap:8px}
+.draft-restore-btn{flex:1;padding:10px;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:var(--r-md);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.draft-restore-btn:active{opacity:0.8}
+.draft-remove-btn{padding:10px 14px;background:none;color:var(--text-tertiary);border:none;border-radius:var(--r-md);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.draft-remove-btn:active{opacity:0.7}
+.draft-card.draft-added{opacity:0.45}
+.draft-added-badge{font-size:11px;color:var(--green);font-weight:600;margin-left:auto;flex-shrink:0;white-space:nowrap}
+.draft-notes-input{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);border-radius:0;padding:4px 0;font-size:12px;color:var(--text-secondary);font-family:inherit;resize:none;min-height:18px;line-height:1.4;overflow:hidden;margin-top:6px}
+.draft-notes-input:focus{outline:none;border-bottom-color:var(--accent)}
+.draft-notes-input::placeholder{color:var(--text-tertiary)}
+.draft-all-added{font-size:13px;color:var(--green);font-weight:500;margin-bottom:8px;margin-top:4px}
 </style>
 </head>
 <body>
@@ -188,10 +236,11 @@ textarea::placeholder{color:var(--text-tertiary)}
   </div>
 </header>
 <div class="view active" id="view-secretary">
-  <div class="chat-box" id="chat"></div>
-  <textarea id="tinput" placeholder="Пиши задачи в свободной форме. Например: надо сегодня забрать Петра из больницы до 15, написать Зимину по попкорну до пятницы, на неделе 2 поста для канала..."></textarea>
-  <button class="send-btn" onclick="sendMsg()">Разобрать задачи</button>
-  <div class="hint">Напиши или надиктуй всё одним текстом — секретарь разложит по задачам.</div>
+  <div class="sec-feed" id="sec-feed"></div>
+  <div class="sec-input-bar">
+    <textarea id="tinput" placeholder="Пиши задачи свободным текстом..." rows="1" oninput="autoResize(this)"></textarea>
+    <button class="sec-send-btn" onclick="sendMsg()" aria-label="Отправить">↑</button>
+  </div>
 </div>
 <div class="view" id="view-today"><div id="today-content"></div></div>
 <div class="view" id="view-board"><div class="board" id="board-content"></div></div>
@@ -365,63 +414,172 @@ async function toggleTask(id){
   await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({done:t.done})});
   renderAll();
 }
+let draftBlocks=new Map();
+let draftBlockCounter=0;
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
 async function sendMsg(){
-  const inp = document.getElementById('tinput');
-  const text = inp.value.trim();
-  if (!text) return;
-
-  inp.value = '';
-
-  const chat = document.getElementById('chat');
-
-  const um = document.createElement('div');
-  um.className = 'msg user';
-  um.textContent = text;
-  chat.appendChild(um);
-
-  const lm = document.createElement('div');
-  lm.className = 'msg loading';
-  lm.textContent = 'Разбираю...';
-  chat.appendChild(lm);
-  lm.scrollIntoView({ behavior: 'smooth', block: 'end' });
-
-  try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-
-    if (!session || !session.access_token) {
-      throw new Error('Нужно войти заново');
-    }
-
-    const resp = await fetch(SUPA_URL + '/functions/v1/parse-tasks', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPA_KEY,
-        'Authorization': 'Bearer ' + session.access_token
-      },
-      body: JSON.stringify({ input: text })
+  const inp=document.getElementById('tinput');
+  const text=inp.value.trim();
+  if(!text)return;
+  inp.value='';
+  inp.style.height='auto';
+  const feed=document.getElementById('sec-feed');
+  const um=document.createElement('div');
+  um.className='sec-bubble-user';
+  um.textContent=text;
+  feed.appendChild(um);
+  const blockId=++draftBlockCounter;
+  const lm=document.createElement('div');
+  lm.className='sec-bubble-bot';
+  lm.id='draft-block-'+blockId;
+  lm.innerHTML='<div class="sec-bubble-label">Секретарь</div><div class="sec-bubble-text">Разбираю...</div>';
+  feed.appendChild(lm);
+  lm.scrollIntoView({behavior:'smooth',block:'end'});
+  try{
+    const{data:{session}}=await supabaseClient.auth.getSession();
+    if(!session||!session.access_token)throw new Error('Нужно войти заново');
+    const resp=await fetch(SUPA_URL+'/functions/v1/parse-tasks',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+session.access_token},
+      body:JSON.stringify({input:text,dry_run:true})
     });
-
-    const data = await resp.json();
-
-    if (!resp.ok || data.error) {
-      throw new Error(data.error || 'Не удалось разобрать текст');
+    const data=await resp.json();
+    if(!resp.ok||data.error)throw new Error(data.error||'Не удалось разобрать текст');
+    const taskList=(data.tasks||[]).map(t=>({...t,_included:true,_status:'pending'}));
+    draftBlocks.set(blockId,{tasks:taskList,cancelled:false});
+    lm.innerHTML=buildDraftsHTML(blockId,taskList);
+    lm.scrollIntoView({behavior:'smooth',block:'end'});
+  }catch(e){
+    lm.innerHTML='<div class="sec-bubble-label">Секретарь</div><div class="sec-bubble-text" style="color:var(--red)">Ошибка: '+(e instanceof Error?e.message:String(e))+'</div>';
+  }
+}
+function buildDraftsHTML(blockId,list){
+  if(!list.length)return'<div class="sec-bubble-label">Секретарь</div><div class="sec-bubble-text">Задач не найдено</div>';
+  const n=list.length;
+  const word=n===1?'задача':n<5?'задачи':'задач';
+  let html='<div class="sec-bubble-label">Секретарь · '+n+' '+word+'</div>';
+  const hasAdded=list.some(t=>t._status==='added');
+  const pending=list.filter(t=>t._status==='pending');
+  list.forEach((t,i)=>{
+    if(t._status==='added'){
+      html+='<div class="draft-card draft-added" id="draft-card-'+blockId+'-'+i+'">'
+        +'<div class="draft-card-top">'
+        +'<input class="draft-card-check" type="checkbox" checked disabled>'
+        +'<div class="draft-card-body" style="display:flex;align-items:center;gap:8px">'
+        +'<div style="font-size:15px;font-weight:500;color:var(--text-secondary);flex:1;min-width:0">'+escHtml(t.text)+'</div>'
+        +'<span class="draft-added-badge">✓ Добавлено</span>'
+        +'</div></div></div>';
+    } else {
+      html+='<div class="draft-card'+(t._included?'':' draft-excluded')+'" id="draft-card-'+blockId+'-'+i+'">'
+        +'<div class="draft-card-top">'
+        +'<input class="draft-card-check" type="checkbox"'+(t._included?' checked':'')+' onchange="setDraftIncluded('+blockId+','+i+',this.checked)">'
+        +'<div class="draft-card-body">'
+        +'<textarea class="draft-text" rows="1" oninput="setDraftField('+blockId+','+i+',\'text\',this.value);autoResize(this)">'+escHtml(t.text)+'</textarea>'
+        +'<div class="draft-fields">'
+        +'<select onchange="setDraftField('+blockId+','+i+',\'project\',this.value)">'+PROJECTS.map(p=>'<option value="'+p.id+'"'+(t.project===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>').join('')+'</select>'
+        +'<input type="date" value="'+(t.due_date||'')+'" onchange="setDraftField('+blockId+','+i+',\'due_date\',this.value||null)">'
+        +'<select onchange="setDraftField('+blockId+','+i+',\'status\',this.value)">'+STATUS_OPTIONS.filter(o=>o.id!=='done').map(o=>'<option value="'+o.id+'"'+(t.status===o.id?' selected':'')+'>'+o.name+'</option>').join('')+'</select>'
+        +'<select onchange="setDraftField('+blockId+','+i+',\'effort\',this.value||null)">'+EFFORT_OPTIONS.map(o=>'<option value="'+o.id+'"'+((t.effort||'')===(o.id)?' selected':'')+'>'+o.name+'</option>').join('')+'</select>'
+        +'</div>'
+        +'<div class="draft-toggles">'
+        +'<label><input type="checkbox"'+(t.urgent?' checked':'')+' onchange="setDraftField('+blockId+','+i+',\'urgent\',this.checked)"> 🔥 Срочно</label>'
+        +'<label><input type="checkbox"'+(t.important?' checked':'')+' onchange="setDraftField('+blockId+','+i+',\'important\',this.checked)"> ⭐ Важно</label>'
+        +'<label><input type="checkbox"'+((t.frog_mode||'auto')==='manual'?' checked':'')+' onchange="setDraftField('+blockId+','+i+',\'frog_mode\',this.checked?\'manual\':\'auto\')"> 🐸 Лягушка</label>'
+        +'</div>'
+        +'<textarea class="draft-notes-input" rows="1" placeholder="Заметки..." oninput="setDraftField('+blockId+','+i+',\'notes\',this.value||null);autoResize(this)">'+escHtml(t.notes||'')+'</textarea>'
+        +'</div></div></div>';
     }
-
-    const created = data.created || [];
-
-    for (const row of created) {
-      tasks.unshift(row);
-    }
-
-    lm.classList.remove('loading');
-    lm.textContent = 'Создано задач: ' + created.length;
-
+  });
+  if(pending.length>0){
+    const count=pending.filter(t=>t._included).length;
+    const btnLabel=hasAdded?'Добавить оставшиеся':('Добавить '+count);
+    html+='<div class="draft-actions">';
+    if(!hasAdded)html+='<button class="draft-cancel-btn" onclick="cancelDrafts('+blockId+')">Отмена</button>';
+    html+='<button class="draft-confirm-btn" id="draft-confirm-btn-'+blockId+'" onclick="confirmDrafts('+blockId+')">'+btnLabel+'</button>'
+      +'</div>';
+  } else {
+    html+='<div class="draft-all-added">✓ Все задачи добавлены</div>'
+      +'<div class="draft-actions">'
+      +'<button class="draft-cancel-btn" onclick="removeDraftBlock('+blockId+')">Убрать из чата</button>'
+      +'</div>';
+  }
+  return html;
+}
+function buildCancelledHTML(blockId,list){
+  const n=list.length;
+  const word=n===1?'задача':n<5?'задачи':'задач';
+  let html='<div class="sec-bubble-label">Секретарь · '+n+' '+word+'</div>';
+  list.forEach(t=>{
+    html+='<div class="draft-card draft-excluded">'
+      +'<div class="draft-card-top">'
+      +'<input class="draft-card-check" type="checkbox"'+(t._included?' checked':'')+' disabled>'
+      +'<div class="draft-card-body">'
+      +'<div style="font-size:15px;font-weight:500;color:var(--text-secondary);text-decoration:line-through;padding:2px 0">'+escHtml(t.text)+'</div>'
+      +'</div></div></div>';
+  });
+  html+='<div class="draft-cancelled-label">Черновик отменён</div>'
+    +'<div class="draft-restore-actions">'
+    +'<button class="draft-restore-btn" onclick="restoreDrafts('+blockId+')">↩ Восстановить черновик</button>'
+    +'<button class="draft-remove-btn" onclick="removeDraftBlock('+blockId+')">Убрать из чата</button>'
+    +'</div>';
+  return html;
+}
+function setDraftIncluded(blockId,i,included){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  if(block.tasks[i]._status==='added')return;
+  block.tasks[i]._included=included;
+  const card=document.getElementById('draft-card-'+blockId+'-'+i);
+  if(card)card.className='draft-card'+(included?'':' draft-excluded');
+  updateDraftConfirmBtn(blockId);
+}
+function setDraftField(blockId,i,field,value){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  block.tasks[i][field]=value;
+}
+function updateDraftConfirmBtn(blockId){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const btn=document.getElementById('draft-confirm-btn-'+blockId);
+  if(!btn)return;
+  const hasAdded=block.tasks.some(t=>t._status==='added');
+  const pending=block.tasks.filter(t=>t._status==='pending');
+  const count=pending.filter(t=>t._included).length;
+  btn.textContent=hasAdded?'Добавить оставшиеся':('Добавить '+count);
+}
+function cancelDrafts(blockId){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const el=document.getElementById('draft-block-'+blockId);
+  if(el)el.innerHTML=buildCancelledHTML(blockId,block.tasks);
+}
+function restoreDrafts(blockId){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const el=document.getElementById('draft-block-'+blockId);
+  if(el)el.innerHTML=buildDraftsHTML(blockId,block.tasks);
+}
+function removeDraftBlock(blockId){
+  draftBlocks.delete(blockId);
+  const el=document.getElementById('draft-block-'+blockId);
+  if(el)el.remove();
+}
+async function confirmDrafts(blockId){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const toSave=block.tasks
+    .filter(t=>t._status==='pending'&&t._included)
+    .map(({_included,_status,...rest})=>({...rest,frog_mode:rest.frog_mode||'auto',done:false}));
+  if(!toSave.length)return;
+  const btn=document.getElementById('draft-confirm-btn-'+blockId);
+  if(btn){btn.textContent='Сохраняю...';btn.disabled=true;}
+  try{
+    const created=await dbFetch('tasks',{method:'POST',body:JSON.stringify(toSave)});
+    if(Array.isArray(created))created.forEach(t=>tasks.unshift(t));
+    block.tasks.forEach(t=>{
+      if(t._status==='pending'&&t._included)t._status='added';
+    });
+    const el=document.getElementById('draft-block-'+blockId);
+    if(el)el.innerHTML=buildDraftsHTML(blockId,block.tasks);
     renderAll();
-    switchTabByName('today');
-  } catch (e) {
-    lm.classList.remove('loading');
-    lm.textContent = 'Ошибка: ' + (e instanceof Error ? e.message : String(e));
+  }catch(e){
+    if(btn){btn.textContent='Ошибка — попробуй снова';btn.disabled=false;}
   }
 }
 

@@ -402,6 +402,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Не удалось выделить ни одной задачи из текста' }, 422);
     }
 
+    if (body?.dry_run === true) {
+      return jsonResponse({ ok: true, tasks: dedupedTasks });
+    }
+
     const { data: created, error: insertError } = await supabaseClient
       .from('tasks')
       .insert(dedupedTasks)
