@@ -315,10 +315,16 @@ textarea::placeholder{color:var(--text-tertiary)}
     <select id="create-project"></select>
     <label class="field-label" for="create-date">Дата</label>
     <input type="date" id="create-date">
-    <label class="field-label" for="create-effort">Объём</label>
-    <select id="create-effort"></select>
     <label class="field-label" for="create-status">Статус</label>
     <select id="create-status"></select>
+    <div class="checkbox-row">
+      <input type="checkbox" id="create-effort-flash" onchange="if(this.checked)document.getElementById('create-effort-elephant').checked=false">
+      <label for="create-effort-flash">⚡ 5 минут</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="create-effort-elephant" onchange="if(this.checked)document.getElementById('create-effort-flash').checked=false">
+      <label for="create-effort-elephant">🐘 Слон</label>
+    </div>
     <div class="checkbox-row">
       <input type="checkbox" id="create-urgent">
       <label for="create-urgent">🔥 Срочно</label>
@@ -348,10 +354,16 @@ textarea::placeholder{color:var(--text-tertiary)}
     <select id="edit-project"></select>
     <label class="field-label" for="edit-date">Дата</label>
     <input type="date" id="edit-date">
-    <label class="field-label" for="edit-effort">Объём</label>
-    <select id="edit-effort"></select>
     <label class="field-label" for="edit-status">Статус</label>
     <select id="edit-status"></select>
+    <div class="checkbox-row">
+      <input type="checkbox" id="edit-effort-flash" onchange="if(this.checked)document.getElementById('edit-effort-elephant').checked=false">
+      <label for="edit-effort-flash">⚡ 5 минут</label>
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="edit-effort-elephant" onchange="if(this.checked)document.getElementById('edit-effort-flash').checked=false">
+      <label for="edit-effort-elephant">🐘 Слон</label>
+    </div>
     <div class="checkbox-row">
       <input type="checkbox" id="edit-urgent">
       <label for="edit-urgent">🔥 Срочно</label>
@@ -386,15 +398,6 @@ const PROJECTS=[
   {id:'personal',name:'Личное',color:'#00c7be'},
   {id:'other',name:'Разное',color:'#666'},
 ];
-const EFFORT_OPTIONS=[
-  {id:'',name:'—'},
-  {id:'2m',name:'2 мин'},
-  {id:'5m',name:'5 мин'},
-  {id:'15m',name:'15 мин'},
-  {id:'30m',name:'30 мин'},
-  {id:'60m',name:'60 мин'},
-  {id:'elephant',name:'Слон'},
-];
 const STATUS_OPTIONS=[
   {id:'inbox',name:'Входящие'},
   {id:'next',name:'Без даты'},
@@ -405,6 +408,23 @@ const STATUS_OPTIONS=[
   {id:'done',name:'Готово'},
 ];
 const STATUS_LABELS=Object.fromEntries(STATUS_OPTIONS.map(o=>[o.id,o.name]));
+function getEffortFromCheckboxes(prefix){
+  if(document.getElementById(prefix+'-effort-flash').checked)return'5m';
+  if(document.getElementById(prefix+'-effort-elephant').checked)return'elephant';
+  return null;
+}
+function setEffortCheckboxes(prefix,effort){
+  document.getElementById(prefix+'-effort-flash').checked=effort==='2m'||effort==='5m';
+  document.getElementById(prefix+'-effort-elephant').checked=effort==='elephant';
+}
+function setDraftEffortCheck(blockId,i,type,checked){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const t=block[i];
+  if(!checked){t.effort=null;return;}
+  t.effort=type==='flash'?'5m':'elephant';
+  const cardEl=document.getElementById('draft-card-'+blockId+'-'+i);
+  if(cardEl)cardEl.querySelectorAll('.draft-effort-check').forEach(cb=>{if(cb.dataset.effortType!==type)cb.checked=false;});
+}
 const BOARD_COLUMNS=[
   {status:'inbox',    name:'Входящие',     match:t=>!t.done&&(t.status||'next')==='inbox'},
   {status:'next',     name:'Без даты',     match:t=>!t.done&&(t.status||'next')==='next'&&!t.due_date},
@@ -525,7 +545,8 @@ function buildDraftsHTML(blockId,list){
         +'<select onchange="setDraftField('+blockId+','+i+',\'project\',this.value)">'+PROJECTS.map(p=>'<option value="'+p.id+'"'+(t.project===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>').join('')+'</select>'
         +'<input type="date" value="'+(t.due_date||'')+'" onchange="setDraftField('+blockId+','+i+',\'due_date\',this.value||null)">'
         +'<select onchange="setDraftField('+blockId+','+i+',\'status\',this.value)">'+STATUS_OPTIONS.filter(o=>o.id!=='done').map(o=>'<option value="'+o.id+'"'+(t.status===o.id?' selected':'')+'>'+o.name+'</option>').join('')+'</select>'
-        +'<select onchange="setDraftField('+blockId+','+i+',\'effort\',this.value||null)">'+EFFORT_OPTIONS.map(o=>'<option value="'+o.id+'"'+((t.effort||'')===(o.id)?' selected':'')+'>'+o.name+'</option>').join('')+'</select>'
+        +'<label><input type="checkbox" class="draft-effort-check" data-effort-type="flash"'+(t.effort==='2m'||t.effort==='5m'?' checked':'')+' onchange="setDraftEffortCheck('+blockId+','+i+',\'flash\',this.checked)"> ⚡ 5 мин</label>'
+        +'<label><input type="checkbox" class="draft-effort-check" data-effort-type="elephant"'+(t.effort==='elephant'?' checked':'')+' onchange="setDraftEffortCheck('+blockId+','+i+',\'elephant\',this.checked)"> 🐘 Слон</label>'
         +'</div>'
         +'<div class="draft-toggles">'
         +'<label><input type="checkbox"'+(t.urgent?' checked':'')+' onchange="setDraftField('+blockId+','+i+',\'urgent\',this.checked)"> 🔥 Срочно</label>'
@@ -664,7 +685,7 @@ function openTaskEditor(id){
   document.getElementById('edit-notes').value=t.notes||'';
   document.getElementById('edit-project').value=t.project||'other';
   document.getElementById('edit-date').value=t.due_date||'';
-  document.getElementById('edit-effort').value=t.effort||'';
+  setEffortCheckboxes('edit',t.effort||null);
   document.getElementById('edit-status').value=t.status||'next';
   document.getElementById('edit-urgent').checked=!!t.urgent;
   document.getElementById('edit-important').checked=!!t.important;
@@ -687,7 +708,7 @@ async function saveTaskEdit(){
     urgent:document.getElementById('edit-urgent').checked,
     notes:document.getElementById('edit-notes').value.trim()||null,
     important:document.getElementById('edit-important').checked,
-    effort:document.getElementById('edit-effort').value||null,
+    effort:getEffortFromCheckboxes('edit'),
     frog_mode:document.getElementById('edit-frog-mode').checked?'manual':'auto',
     status
   };
@@ -719,7 +740,7 @@ function openCreateTaskModal(){
   document.getElementById('create-notes').value='';
   document.getElementById('create-project').value=defaults.project;
   document.getElementById('create-date').value=defaults.due_date;
-  document.getElementById('create-effort').value=defaults.effort;
+  setEffortCheckboxes('create',null);
   document.getElementById('create-status').value=defaults.status;
   document.getElementById('create-urgent').checked=defaults.urgent;
   document.getElementById('create-important').checked=defaults.important;
@@ -737,7 +758,7 @@ async function createTask(){
     notes:document.getElementById('create-notes').value.trim()||null,
     project:document.getElementById('create-project').value,
     due_date:document.getElementById('create-date').value||null,
-    effort:document.getElementById('create-effort').value||null,
+    effort:getEffortFromCheckboxes('create'),
     status:document.getElementById('create-status').value||'next',
     urgent:document.getElementById('create-urgent').checked,
     important:document.getElementById('create-important').checked,
@@ -754,15 +775,14 @@ function makeTaskEl(t,draggable){
   const ds=fmtDate(t.due_date);
   const isDone=t.done||t.status==='done';
   const isUrgent=!isDone&&(t.urgent||(t.due_date&&new Date(t.due_date+'T00:00:00')<=new Date()));
-  const effortOpt=EFFORT_OPTIONS.find(o=>o.id===t.effort);
-  const effortName=(t.effort&&effortOpt)?effortOpt.name:'';
+  const effortLabel=t.effort==='2m'||t.effort==='5m'?'⚡ 5 мин':t.effort==='elephant'?'🐘 Слон':'';
   const todayISO=new Date().toISOString().split('T')[0];
   const isOverdue=!t.done&&t.due_date&&t.due_date<todayISO;
   const card=document.createElement('div');card.className='task-card'+(isUrgent?' urgent':'');
   const main=document.createElement('div');main.className='task-main';
   const metaParts=[];
   if(ds)metaParts.push(isOverdue?`<span class="meta-overdue">${ds}</span>`:ds);
-  if(effortName)metaParts.push(effortName);
+  if(effortLabel)metaParts.push(effortLabel);
   metaParts.push(`<span class="proj-dot" style="background:${proj.color}"></span>${proj.name}`);
   main.innerHTML=`
     <div class="check${t.done?' done':''}" onclick="toggleTask(${t.id})">
@@ -864,9 +884,7 @@ function renderToday(){
       }else if(frog.effort==='elephant'){
         reason.textContent='🐸 Главная задача дня · большая задача';
       }else{
-        const opt=EFFORT_OPTIONS.find(o=>o.id===frog.effort);
-        const effortName=(frog.effort&&opt)?opt.name:'';
-        reason.textContent='🐸 Главная задача дня · важно'+(effortName?' · '+effortName:'');
+        reason.textContent='🐸 Главная задача дня · важно';
       }
       card.querySelector('.task-text').insertAdjacentElement('afterend',reason);
       c.appendChild(card);
@@ -1193,10 +1211,8 @@ function closeDrawer(){
   document.body.classList.remove('no-scroll');
 }
 document.getElementById('edit-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-document.getElementById('edit-effort').innerHTML=EFFORT_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.getElementById('edit-status').innerHTML=STATUS_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.getElementById('create-project').innerHTML=PROJECTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-document.getElementById('create-effort').innerHTML=EFFORT_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.getElementById('create-status').innerHTML=STATUS_OPTIONS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('');
 document.addEventListener('click',closeAllTaskMenus);
 document.getElementById('tinput').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))sendMsg();});
