@@ -839,11 +839,12 @@ function renderToday(){
 
   // 1. Лягушка
   const activeOk=t=>isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t);
-  let frog=tasks.find(t=>activeOk(t)&&(t.frog_mode||'auto')==='manual');
+  const isFrogSize=t=>!t.effort||t.effort==='5m'||t.effort==='15m'||t.effort==='30m';
+  let frog=tasks.find(t=>activeOk(t)&&(t.frog_mode||'auto')==='manual'&&isFrogSize(t));
   if(!frog){
-    const frogCandidates=tasks.filter(t=>activeOk(t)&&t.important&&(t.frog_mode||'auto')!=='blocked');
-    frog=frogCandidates.find(t=>['elephant','60m','30m'].includes(t.effort));
-    if(!frog)frog=frogCandidates.find(t=>t.effort==='15m'||!t.effort);
+    const frogPool=tasks.filter(t=>activeOk(t)&&isFrogSize(t)&&(t.frog_mode||'auto')!=='blocked');
+    frog=frogPool.find(t=>t.urgent&&t.important);
+    if(!frog)frog=frogPool.find(t=>t.important&&!t.due_date);
   }
   if(frog)shownIds.add(frog.id);
 
@@ -881,10 +882,10 @@ function renderToday(){
       const reason=document.createElement('div');reason.className='frog-reason';
       if((frog.frog_mode||'auto')==='manual'){
         reason.textContent='🐸 Лягушка назначена вручную';
-      }else if(frog.effort==='elephant'){
-        reason.textContent='🐸 Главная задача дня · большая задача';
+      }else if(frog.urgent&&frog.important){
+        reason.textContent='🐸 Срочно и неприятно — закрой первой';
       }else{
-        reason.textContent='🐸 Главная задача дня · важно';
+        reason.textContent='🐸 Откладываешь? Самое время сделать';
       }
       card.querySelector('.task-text').insertAdjacentElement('afterend',reason);
       c.appendChild(card);
