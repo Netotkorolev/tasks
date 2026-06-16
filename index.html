@@ -147,9 +147,10 @@ textarea::placeholder{color:var(--text-tertiary)}
 }
 /* Secretary chat layout */
 #view-secretary{padding:0}
-#view-secretary.active{display:flex;flex-direction:column;height:calc(100vh - 62px);overflow:hidden}
+#view-secretary.active{display:flex;flex-direction:column;height:calc(100vh - 62px);height:calc(100dvh - 62px);overflow:hidden}
 #view-secretary.active~.fab{display:none}
-.sec-feed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--sp-3) var(--sp-4);display:flex;flex-direction:column;gap:10px}
+.sec-feed{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:var(--sp-3) var(--sp-4);display:flex;flex-direction:column;gap:10px}
+.sec-empty-hint{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-tertiary);font-size:14px;line-height:1.6;padding:var(--sp-4);pointer-events:none;user-select:none}
 .sec-input-bar{flex-shrink:0;display:flex;align-items:flex-end;gap:8px;padding:10px var(--sp-4) calc(env(safe-area-inset-bottom) + 10px);border-top:1px solid var(--border);background:var(--surface)}
 .sec-input-bar textarea{flex:1;min-height:40px;max-height:120px;resize:none;border-radius:20px;padding:10px 14px;font-size:15px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:inherit;line-height:1.4;overflow-y:auto}
 .sec-input-bar textarea:focus{outline:none;border-color:var(--accent)}
@@ -187,6 +188,11 @@ textarea::placeholder{color:var(--text-tertiary)}
 .draft-restore-btn:active{opacity:0.8}
 .draft-remove-btn{padding:10px 14px;background:none;color:var(--text-tertiary);border:none;border-radius:var(--r-md);font-size:13px;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .draft-remove-btn:active{opacity:0.7}
+@media (max-width:480px){
+  #view-secretary.active{height:calc(100svh - 62px)}
+  .sec-feed{padding:var(--sp-2) var(--sp-3)}
+  .sec-bubble-user{max-width:88%}
+}
 .draft-card.draft-added{opacity:0.45}
 .draft-added-badge{font-size:11px;color:var(--green);font-weight:600;margin-left:auto;flex-shrink:0;white-space:nowrap}
 .draft-notes-input{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);border-radius:0;padding:4px 0;font-size:12px;color:var(--text-secondary);font-family:inherit;resize:none;min-height:18px;line-height:1.4;overflow:hidden;margin-top:6px}
@@ -252,7 +258,9 @@ textarea::placeholder{color:var(--text-tertiary)}
   </div>
 </header>
 <div class="view active" id="view-secretary">
-  <div class="sec-feed" id="sec-feed"></div>
+  <div class="sec-feed" id="sec-feed">
+    <div class="sec-empty-hint" id="sec-empty-hint">Напиши задачи свободным текстом</div>
+  </div>
   <div class="sec-input-bar">
     <textarea id="tinput" placeholder="Пиши задачи свободным текстом..." rows="1" oninput="autoResize(this)"></textarea>
     <button class="sec-send-btn" onclick="sendMsg()" aria-label="Отправить">↑</button>
@@ -458,6 +466,8 @@ async function sendMsg(){
   if(!text)return;
   inp.value='';
   inp.style.height='auto';
+  const hint=document.getElementById('sec-empty-hint');
+  if(hint)hint.remove();
   const feed=document.getElementById('sec-feed');
   const um=document.createElement('div');
   um.className='sec-bubble-user';
