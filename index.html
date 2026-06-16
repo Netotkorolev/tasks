@@ -235,6 +235,12 @@ textarea::placeholder{color:var(--text-tertiary)}
       <input type="checkbox" id="create-important">
       <label for="create-important">Важно</label>
     </div>
+    <label class="field-label" for="create-frog-mode">🐸 Лягушка дня</label>
+    <select id="create-frog-mode">
+      <option value="auto">Авто (система выбирает)</option>
+      <option value="manual">Назначить лягушкой</option>
+      <option value="blocked">Исключить из лягушек</option>
+    </select>
     <div class="modal-actions">
       <button class="cancel-btn" onclick="closeCreateTaskModal()">Отмена</button>
       <button class="save-btn" onclick="createTask()">Создать</button>
@@ -264,6 +270,12 @@ textarea::placeholder{color:var(--text-tertiary)}
       <input type="checkbox" id="edit-important">
       <label for="edit-important">Важно</label>
     </div>
+    <label class="field-label" for="edit-frog-mode">🐸 Лягушка дня</label>
+    <select id="edit-frog-mode">
+      <option value="auto">Авто (система выбирает)</option>
+      <option value="manual">Назначить лягушкой</option>
+      <option value="blocked">Исключить из лягушек</option>
+    </select>
     <div class="modal-actions">
       <button class="cancel-btn" onclick="closeTaskEditor()">Отмена</button>
       <button class="save-btn" onclick="saveTaskEdit()">Сохранить</button>
@@ -355,6 +367,12 @@ async function toggleTask(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   t.done=!t.done;
   await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({done:t.done})});
+  renderAll();
+}
+async function setFrogMode(id,mode){
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.frog_mode=mode;
+  await dbFetch('tasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({frog_mode:mode})});
   renderAll();
 }
 async function sendMsg(){
@@ -457,6 +475,7 @@ function openTaskEditor(id){
   document.getElementById('edit-status').value=t.status||'next';
   document.getElementById('edit-urgent').checked=!!t.urgent;
   document.getElementById('edit-important').checked=!!t.important;
+  document.getElementById('edit-frog-mode').value=t.frog_mode||'auto';
   document.getElementById('edit-overlay').classList.add('active');
 }
 function closeTaskEditor(){
@@ -476,6 +495,7 @@ async function saveTaskEdit(){
     notes:document.getElementById('edit-notes').value.trim()||null,
     important:document.getElementById('edit-important').checked,
     effort:document.getElementById('edit-effort').value||null,
+    frog_mode:document.getElementById('edit-frog-mode').value||'auto',
     status
   };
   if(status==='done')patch.done=true;
@@ -510,6 +530,7 @@ function openCreateTaskModal(){
   document.getElementById('create-status').value=defaults.status;
   document.getElementById('create-urgent').checked=defaults.urgent;
   document.getElementById('create-important').checked=defaults.important;
+  document.getElementById('create-frog-mode').value='auto';
   document.getElementById('create-overlay').classList.add('active');
 }
 function closeCreateTaskModal(){
@@ -527,6 +548,7 @@ async function createTask(){
     status:document.getElementById('create-status').value||'next',
     urgent:document.getElementById('create-urgent').checked,
     important:document.getElementById('create-important').checked,
+    frog_mode:document.getElementById('create-frog-mode').value||'auto',
     done:false
   };
   const created=await dbFetch('tasks',{method:'POST',body:JSON.stringify(payload)});
@@ -562,6 +584,9 @@ function makeTaskEl(t,draggable){
     <button class="task-menu-btn" onclick="toggleTaskMenu(event,this)">⋯</button>
     <div class="task-menu">
       <button onclick="closeAllTaskMenus();openTaskEditor(${t.id})">Редактировать</button>
+      ${(t.frog_mode||'auto')!=='manual'?`<button onclick="closeAllTaskMenus();setFrogMode(${t.id},'manual')">🐸 Назначить лягушкой</button>`:''}
+      ${(t.frog_mode||'auto')!=='blocked'?`<button onclick="closeAllTaskMenus();setFrogMode(${t.id},'blocked')">🚫 Исключить из лягушек</button>`:''}
+      ${(t.frog_mode||'auto')!=='auto'?`<button onclick="closeAllTaskMenus();setFrogMode(${t.id},'auto')">↩ Авто (сбросить)</button>`:''}
       <button class="danger" onclick="closeAllTaskMenus();deleteTask(${t.id})">Удалить</button>
     </div>`;
   card.appendChild(main);
@@ -589,9 +614,13 @@ function renderToday(){
   const shownIds=new Set();
 
   // 1. Лягушка
-  const frogCandidates=tasks.filter(t=>isActive(t)&&t.important&&activeStatuses.includes(st(t))&&dueOk(t));
-  let frog=frogCandidates.find(t=>['elephant','60m','30m'].includes(t.effort));
-  if(!frog)frog=frogCandidates.find(t=>t.effort==='15m'||!t.effort);
+  const activeOk=t=>isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t);
+  let frog=tasks.find(t=>activeOk(t)&&(t.frog_mode||'auto')==='manual');
+  if(!frog){
+    const frogCandidates=tasks.filter(t=>activeOk(t)&&t.important&&(t.frog_mode||'auto')!=='blocked');
+    frog=frogCandidates.find(t=>['elephant','60m','30m'].includes(t.effort));
+    if(!frog)frog=frogCandidates.find(t=>t.effort==='15m'||!t.effort);
+  }
   if(frog)shownIds.add(frog.id);
 
   // 2. Молнии
@@ -626,7 +655,9 @@ function renderToday(){
       const l=document.createElement('div');l.className='section-label';l.textContent='🐸 Съешь лягушку';c.appendChild(l);
       const card=makeTaskEl(frog);card.classList.add('frog');
       const reason=document.createElement('div');reason.className='frog-reason';
-      if(frog.effort==='elephant'){
+      if((frog.frog_mode||'auto')==='manual'){
+        reason.textContent='🐸 Лягушка назначена вручную';
+      }else if(frog.effort==='elephant'){
         reason.textContent='🐸 Главная задача дня · большая задача';
       }else{
         const opt=EFFORT_OPTIONS.find(o=>o.id===frog.effort);
