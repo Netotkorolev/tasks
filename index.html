@@ -859,7 +859,7 @@ function renderToday(){
   if(elephant)shownIds.add(elephant.id);
 
   // 4. Срочно и важно
-  const urgentImportant=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t)&&(t.urgent||(t.due_date&&t.due_date<=todayISO)));
+  const urgentImportant=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t)&&t.urgent&&t.important);
   urgentImportant.forEach(t=>shownIds.add(t.id));
 
   // 5. Остальное
