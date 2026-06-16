@@ -67,7 +67,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .send-btn:active{opacity:0.85}
 .hint{font-size:12px;color:var(--text-tertiary);margin-top:6px;text-align:center}
 .section-label{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
-.task-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:8px;overflow:hidden;position:relative;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.task-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:8px;position:relative;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.06)}
 .task-card.dragging{opacity:0.4}
 .task-card.urgent{box-shadow:0 1px 3px rgba(0,0,0,0.06),inset 3px 0 0 var(--red)}
 .task-card.frog{border:1px solid rgba(139,92,246,0.3);background:rgba(139,92,246,0.06)}
@@ -99,7 +99,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .task-menu-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border:none;background:transparent;color:var(--text-secondary);font-size:18px;line-height:1;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;touch-action:manipulation}
 .task-menu-btn::after{content:'';position:absolute;top:50%;left:50%;width:44px;height:44px;transform:translate(-50%,-50%)}
 .task-menu-btn:active{background:var(--surface-2)}
-.task-menu{display:none;position:absolute;top:32px;right:6px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;z-index:10;min-width:130px;box-shadow:0 4px 12px rgba(0,0,0,0.10)}
+.task-menu{display:none;position:absolute;top:32px;right:6px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;z-index:50;min-width:130px;box-shadow:0 4px 12px rgba(0,0,0,0.10)}
 .task-menu.open{display:block}
 .task-menu button{display:block;width:100%;text-align:left;padding:10px 14px;font-size:13px;background:none;border:none;color:var(--text);cursor:pointer;font-family:inherit;touch-action:manipulation}
 .task-menu button:active{background:var(--surface-2)}
@@ -193,6 +193,19 @@ textarea::placeholder{color:var(--text-tertiary)}
 .draft-notes-input:focus{outline:none;border-bottom-color:var(--accent)}
 .draft-notes-input::placeholder{color:var(--text-tertiary)}
 .draft-all-added{font-size:13px;color:var(--green);font-weight:500;margin-bottom:8px;margin-top:4px}
+.select-mode-btn{margin-left:auto;flex-shrink:0;padding:5px 11px;background:none;border:1px solid var(--border);border-radius:var(--r-md);font-size:13px;color:var(--text-secondary);cursor:pointer;font-family:inherit;touch-action:manipulation}
+.select-bar{display:none;align-items:center;gap:8px;padding:0 var(--sp-4) 8px}
+.select-bar.active{display:flex}
+.select-count{font-size:14px;font-weight:600;color:var(--text);flex:1}
+.select-delete-btn{padding:8px 14px;background:var(--red);color:#fff;border:none;border-radius:var(--r-md);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.select-delete-btn:disabled{opacity:0.35;cursor:default}
+.select-delete-btn:not(:disabled):active{opacity:0.85}
+.select-cancel-btn{padding:8px 12px;background:none;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;font-family:inherit;touch-action:manipulation}
+.task-card.task-selected{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-soft)}
+#view-alltasks.select-mode-active #alltasks-filters{display:none}
+#view-alltasks.select-mode-active .task-menu-btn{display:none}
+#view-alltasks.select-mode-active .check{display:none}
+.task-select-check{flex-shrink:0;width:18px;height:18px;cursor:pointer;accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -254,6 +267,13 @@ textarea::placeholder{color:var(--text-tertiary)}
     <button class="chip" data-filter="all" onclick="setAllTasksFilter('all')">Все</button>
     <button class="chip" data-filter="dated" onclick="setAllTasksFilter('dated')">С датой</button>
     <button class="chip" data-filter="undated" onclick="setAllTasksFilter('undated')">Без даты</button>
+    <button class="select-mode-btn" id="select-mode-btn" onclick="enterSelectMode()">Выбрать</button>
+  </div>
+  <div class="select-bar" id="select-bar">
+    <span class="select-count" id="select-count">Выбрано: 0</span>
+    <button class="select-cancel-btn" onclick="exitSelectMode()">Отмена</button>
+    <button class="select-cancel-btn" onclick="selectAllTasks()">Выбрать все</button>
+    <button class="select-delete-btn" id="select-delete-btn" onclick="deleteSelected()" disabled>Удалить</button>
   </div>
   <div id="alltasks-content"></div>
 </div>
@@ -909,6 +929,8 @@ function renderDone(){
   if(!done.length){c.innerHTML='<div class="empty">Пока ничего не выполнено</div>';return;}
   done.forEach(t=>c.appendChild(makeTaskEl(t)));
 }
+let selectMode=false;
+let selectedTaskIds=new Set();
 let allTasksFilter='all';
 let allTasksProjectFilter=null;
 function setAllTasksFilter(f){
@@ -922,6 +944,7 @@ function openProjectFilter(projectId){
 }
 function openAllTasksView(){
   allTasksProjectFilter=null;
+  if(selectMode)exitSelectMode();
   setView('alltasks');
   renderAllTasks();
 }
@@ -929,6 +952,63 @@ function clearAllTasksProjectFilter(){
   allTasksProjectFilter=null;
   renderAllTasks();
   updateHeader('alltasks');
+}
+function enterSelectMode(){
+  selectMode=true;
+  selectedTaskIds.clear();
+  document.getElementById('view-alltasks').classList.add('select-mode-active');
+  document.getElementById('select-bar').classList.add('active');
+  renderAllTasks();
+}
+function exitSelectMode(){
+  selectMode=false;
+  selectedTaskIds.clear();
+  document.getElementById('view-alltasks').classList.remove('select-mode-active');
+  document.getElementById('select-bar').classList.remove('active');
+  renderAllTasks();
+}
+function toggleSelectTask(id){
+  if(selectedTaskIds.has(id))selectedTaskIds.delete(id);
+  else selectedTaskIds.add(id);
+  const card=document.querySelector('#alltasks-content [data-id="'+String(id)+'"]');
+  if(card)card.classList.toggle('task-selected',selectedTaskIds.has(id));
+  const chk=card&&card.querySelector('.task-select-check');
+  if(chk)chk.checked=selectedTaskIds.has(id);
+  updateSelectBar();
+}
+function updateSelectBar(){
+  const n=selectedTaskIds.size;
+  document.getElementById('select-count').textContent='Выбрано: '+n;
+  document.getElementById('select-delete-btn').disabled=n===0;
+}
+function selectAllTasks(){
+  let active=tasks.filter(t=>!t.done&&t.status!=='done');
+  if(allTasksProjectFilter)active=active.filter(t=>t.project===allTasksProjectFilter);
+  const byDate=(a,b)=>a.due_date<b.due_date?-1:a.due_date>b.due_date?1:0;
+  if(allTasksFilter==='dated'){
+    active.filter(t=>t.due_date).forEach(t=>selectedTaskIds.add(t.id));
+  }else if(allTasksFilter==='undated'){
+    active.filter(t=>!t.due_date).forEach(t=>selectedTaskIds.add(t.id));
+  }else{
+    active.forEach(t=>selectedTaskIds.add(t.id));
+  }
+  renderAllTasks();
+  updateSelectBar();
+}
+async function deleteSelected(){
+  const n=selectedTaskIds.size;
+  if(!n)return;
+  const word=n===1?'задачу':n<5?'задачи':'задач';
+  if(!confirm('Удалить '+n+' '+word+'? Это действие нельзя отменить.'))return;
+  const ids=[...selectedTaskIds];
+  try{
+    await dbFetch('tasks?id=in.('+ids.join(',')+')',{method:'DELETE'});
+    tasks=tasks.filter(t=>!selectedTaskIds.has(t.id));
+    exitSelectMode();
+    renderAll();
+  }catch(e){
+    alert('Ошибка при удалении. Попробуй ещё раз.');
+  }
 }
 function renderAllTasks(){
   document.querySelectorAll('#alltasks-filters .chip').forEach(b=>{
@@ -958,7 +1038,21 @@ function renderAllTasks(){
     list=dated.concat(undated);
   }
   if(!list.length){c.innerHTML='<div class="empty">Задач нет</div>';return;}
-  list.forEach(t=>c.appendChild(makeTaskEl(t)));
+  list.forEach(t=>{
+    const el=makeTaskEl(t);
+    if(selectMode){
+      el.dataset.id=String(t.id);
+      const chk=document.createElement('input');
+      chk.type='checkbox';
+      chk.className='task-select-check';
+      chk.checked=selectedTaskIds.has(t.id);
+      chk.addEventListener('click',e=>e.stopPropagation());
+      el.querySelector('.task-main').prepend(chk);
+      if(selectedTaskIds.has(t.id))el.classList.add('task-selected');
+      el.addEventListener('click',()=>toggleSelectTask(t.id));
+    }
+    c.appendChild(el);
+  });
 }
 function renderDrawerProjects(){
   const c=document.getElementById('drawer-projects');c.innerHTML='';
