@@ -774,7 +774,7 @@ function makeTaskEl(t,draggable){
   const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
   const ds=fmtDate(t.due_date);
   const isDone=t.done||t.status==='done';
-  const isUrgent=!isDone&&(t.urgent||(t.due_date&&new Date(t.due_date+'T00:00:00')<=new Date()));
+  const isUrgent=!isDone&&t.important&&t.urgent;
   const effortLabel=t.effort==='2m'||t.effort==='5m'?'⚡ 5 мин':t.effort==='elephant'?'🐘 Слон':'';
   const todayISO=new Date().toISOString().split('T')[0];
   const isOverdue=!t.done&&t.due_date&&t.due_date<todayISO;
