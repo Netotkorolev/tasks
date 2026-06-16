@@ -205,6 +205,9 @@ textarea::placeholder{color:var(--text-tertiary)}
 #view-alltasks.select-mode-active #alltasks-filters{display:none}
 #view-alltasks.select-mode-active .task-menu-btn{display:none}
 #view-alltasks.select-mode-active .check{display:none}
+#view-done.select-mode-active #done-filters{display:none}
+#view-done.select-mode-active .task-menu-btn{display:none}
+#view-done.select-mode-active .check{display:none}
 .task-select-check{flex-shrink:0;width:18px;height:18px;cursor:pointer;accent-color:var(--accent)}
 </style>
 </head>
@@ -230,7 +233,7 @@ textarea::placeholder{color:var(--text-tertiary)}
     <button class="drawer-item" data-view="today" onclick="setView('today')">Сегодня</button>
     <button class="drawer-item" data-view="board" onclick="setView('board')">Доска</button>
     <button class="drawer-item" data-view="alltasks" onclick="openAllTasksView()">Все задачи</button>
-    <button class="drawer-item" data-view="done" onclick="setView('done')">Выполнено</button>
+    <button class="drawer-item" data-view="done" onclick="openDoneView()">Выполнено</button>
     <div class="drawer-divider"></div>
     <div class="drawer-section-label">Проекты</div>
     <div id="drawer-projects"></div>
@@ -267,18 +270,29 @@ textarea::placeholder{color:var(--text-tertiary)}
     <button class="chip" data-filter="all" onclick="setAllTasksFilter('all')">Все</button>
     <button class="chip" data-filter="dated" onclick="setAllTasksFilter('dated')">С датой</button>
     <button class="chip" data-filter="undated" onclick="setAllTasksFilter('undated')">Без даты</button>
-    <button class="select-mode-btn" id="select-mode-btn" onclick="enterSelectMode()">Выбрать</button>
+    <button class="select-mode-btn" id="select-mode-btn" onclick="enterSelectMode('alltasks')">Выбрать</button>
   </div>
   <div class="select-bar" id="select-bar">
     <span class="select-count" id="select-count">Выбрано: 0</span>
     <button class="select-cancel-btn" onclick="exitSelectMode()">Отмена</button>
-    <button class="select-cancel-btn" onclick="selectAllTasks()">Выбрать все</button>
+    <button class="select-cancel-btn" onclick="selectAllVisible()">Выбрать все</button>
     <button class="select-delete-btn" id="select-delete-btn" onclick="deleteSelected()" disabled>Удалить</button>
   </div>
   <div id="alltasks-content"></div>
 </div>
 <div class="view" id="view-projects"><div id="proj-content"></div></div>
-<div class="view" id="view-done"><div id="done-content"></div></div>
+<div class="view" id="view-done">
+  <div class="filter-chips" id="done-filters">
+    <button class="select-mode-btn" onclick="enterSelectMode('done')">Выбрать</button>
+  </div>
+  <div class="select-bar" id="done-select-bar">
+    <span class="select-count" id="done-select-count">Выбрано: 0</span>
+    <button class="select-cancel-btn" onclick="exitSelectMode()">Отмена</button>
+    <button class="select-cancel-btn" onclick="selectAllVisible()">Выбрать все</button>
+    <button class="select-delete-btn" id="done-select-delete-btn" onclick="deleteSelected()" disabled>Удалить</button>
+  </div>
+  <div id="done-content"></div>
+</div>
 <button class="fab" onclick="openCreateTaskModal()" aria-label="Добавить задачу">+</button>
 </div>
 <div class="modal-overlay" id="create-overlay">
@@ -923,14 +937,112 @@ function renderBoard(){
     c.appendChild(colEl);
   });
 }
+let selectMode=false;
+let selectScope=null;
+let selectedTaskIds=new Set();
+function openDoneView(){
+  if(selectMode)exitSelectMode();
+  setView('done');
+}
+function enterSelectMode(scope){
+  selectMode=true;
+  selectScope=scope||'alltasks';
+  selectedTaskIds.clear();
+  if(selectScope==='done'){
+    document.getElementById('view-done').classList.add('select-mode-active');
+    document.getElementById('done-select-bar').classList.add('active');
+    renderDone();
+  }else{
+    document.getElementById('view-alltasks').classList.add('select-mode-active');
+    document.getElementById('select-bar').classList.add('active');
+    renderAllTasks();
+  }
+}
+function exitSelectMode(){
+  const scope=selectScope;
+  selectMode=false;
+  selectScope=null;
+  selectedTaskIds.clear();
+  if(scope==='done'){
+    document.getElementById('view-done').classList.remove('select-mode-active');
+    document.getElementById('done-select-bar').classList.remove('active');
+    renderDone();
+  }else{
+    document.getElementById('view-alltasks').classList.remove('select-mode-active');
+    document.getElementById('select-bar').classList.remove('active');
+    renderAllTasks();
+  }
+}
+function toggleSelectTask(id){
+  if(selectedTaskIds.has(id))selectedTaskIds.delete(id);
+  else selectedTaskIds.add(id);
+  const container=selectScope==='done'?'#done-content':'#alltasks-content';
+  const card=document.querySelector(container+' [data-id="'+String(id)+'"]');
+  const selected=selectedTaskIds.has(id);
+  if(card){
+    card.classList.toggle('task-selected',selected);
+    const chk=card.querySelector('.task-select-check');
+    if(chk)chk.checked=selected;
+  }
+  updateSelectBar();
+}
+function updateSelectBar(){
+  const n=selectedTaskIds.size;
+  const countEl=document.getElementById(selectScope==='done'?'done-select-count':'select-count');
+  const btnEl=document.getElementById(selectScope==='done'?'done-select-delete-btn':'select-delete-btn');
+  if(countEl)countEl.textContent='Выбрано: '+n;
+  if(btnEl)btnEl.disabled=n===0;
+}
+function selectAllVisible(){
+  if(selectScope==='done'){
+    tasks.filter(t=>t.done).forEach(t=>selectedTaskIds.add(t.id));
+    renderDone();
+  }else{
+    let active=tasks.filter(t=>!t.done&&t.status!=='done');
+    if(allTasksProjectFilter)active=active.filter(t=>t.project===allTasksProjectFilter);
+    if(allTasksFilter==='dated')active=active.filter(t=>t.due_date);
+    else if(allTasksFilter==='undated')active=active.filter(t=>!t.due_date);
+    active.forEach(t=>selectedTaskIds.add(t.id));
+    renderAllTasks();
+  }
+  updateSelectBar();
+}
+async function deleteSelected(){
+  const n=selectedTaskIds.size;
+  if(!n)return;
+  const isDone=selectScope==='done';
+  const word=isDone?(n===1?'выполненную задачу':n<5?'выполненных задачи':'выполненных задач'):(n===1?'задачу':n<5?'задачи':'задач');
+  if(!confirm('Удалить '+n+' '+word+'? Это действие нельзя отменить.'))return;
+  const ids=[...selectedTaskIds];
+  try{
+    await dbFetch('tasks?id=in.('+ids.join(',')+')',{method:'DELETE'});
+    tasks=tasks.filter(t=>!selectedTaskIds.has(t.id));
+    exitSelectMode();
+    renderAll();
+  }catch(e){
+    alert('Ошибка при удалении. Попробуй ещё раз.');
+  }
+}
 function renderDone(){
   const c=document.getElementById('done-content');c.innerHTML='';
   const done=tasks.filter(t=>t.done);
   if(!done.length){c.innerHTML='<div class="empty">Пока ничего не выполнено</div>';return;}
-  done.forEach(t=>c.appendChild(makeTaskEl(t)));
+  done.forEach(t=>{
+    const el=makeTaskEl(t);
+    if(selectMode&&selectScope==='done'){
+      el.dataset.id=String(t.id);
+      const chk=document.createElement('input');
+      chk.type='checkbox';
+      chk.className='task-select-check';
+      chk.checked=selectedTaskIds.has(t.id);
+      chk.addEventListener('click',e=>{e.stopPropagation();toggleSelectTask(t.id);});
+      el.querySelector('.task-main').prepend(chk);
+      if(selectedTaskIds.has(t.id))el.classList.add('task-selected');
+      el.addEventListener('click',()=>toggleSelectTask(t.id));
+    }
+    c.appendChild(el);
+  });
 }
-let selectMode=false;
-let selectedTaskIds=new Set();
 let allTasksFilter='all';
 let allTasksProjectFilter=null;
 function setAllTasksFilter(f){
@@ -952,63 +1064,6 @@ function clearAllTasksProjectFilter(){
   allTasksProjectFilter=null;
   renderAllTasks();
   updateHeader('alltasks');
-}
-function enterSelectMode(){
-  selectMode=true;
-  selectedTaskIds.clear();
-  document.getElementById('view-alltasks').classList.add('select-mode-active');
-  document.getElementById('select-bar').classList.add('active');
-  renderAllTasks();
-}
-function exitSelectMode(){
-  selectMode=false;
-  selectedTaskIds.clear();
-  document.getElementById('view-alltasks').classList.remove('select-mode-active');
-  document.getElementById('select-bar').classList.remove('active');
-  renderAllTasks();
-}
-function toggleSelectTask(id){
-  if(selectedTaskIds.has(id))selectedTaskIds.delete(id);
-  else selectedTaskIds.add(id);
-  const card=document.querySelector('#alltasks-content [data-id="'+String(id)+'"]');
-  if(card)card.classList.toggle('task-selected',selectedTaskIds.has(id));
-  const chk=card&&card.querySelector('.task-select-check');
-  if(chk)chk.checked=selectedTaskIds.has(id);
-  updateSelectBar();
-}
-function updateSelectBar(){
-  const n=selectedTaskIds.size;
-  document.getElementById('select-count').textContent='Выбрано: '+n;
-  document.getElementById('select-delete-btn').disabled=n===0;
-}
-function selectAllTasks(){
-  let active=tasks.filter(t=>!t.done&&t.status!=='done');
-  if(allTasksProjectFilter)active=active.filter(t=>t.project===allTasksProjectFilter);
-  const byDate=(a,b)=>a.due_date<b.due_date?-1:a.due_date>b.due_date?1:0;
-  if(allTasksFilter==='dated'){
-    active.filter(t=>t.due_date).forEach(t=>selectedTaskIds.add(t.id));
-  }else if(allTasksFilter==='undated'){
-    active.filter(t=>!t.due_date).forEach(t=>selectedTaskIds.add(t.id));
-  }else{
-    active.forEach(t=>selectedTaskIds.add(t.id));
-  }
-  renderAllTasks();
-  updateSelectBar();
-}
-async function deleteSelected(){
-  const n=selectedTaskIds.size;
-  if(!n)return;
-  const word=n===1?'задачу':n<5?'задачи':'задач';
-  if(!confirm('Удалить '+n+' '+word+'? Это действие нельзя отменить.'))return;
-  const ids=[...selectedTaskIds];
-  try{
-    await dbFetch('tasks?id=in.('+ids.join(',')+')',{method:'DELETE'});
-    tasks=tasks.filter(t=>!selectedTaskIds.has(t.id));
-    exitSelectMode();
-    renderAll();
-  }catch(e){
-    alert('Ошибка при удалении. Попробуй ещё раз.');
-  }
 }
 function renderAllTasks(){
   document.querySelectorAll('#alltasks-filters .chip').forEach(b=>{
@@ -1046,7 +1101,7 @@ function renderAllTasks(){
       chk.type='checkbox';
       chk.className='task-select-check';
       chk.checked=selectedTaskIds.has(t.id);
-      chk.addEventListener('click',e=>e.stopPropagation());
+      chk.addEventListener('click',e=>{e.stopPropagation();toggleSelectTask(t.id);});
       el.querySelector('.task-main').prepend(chk);
       if(selectedTaskIds.has(t.id))el.classList.add('task-selected');
       el.addEventListener('click',()=>toggleSelectTask(t.id));
