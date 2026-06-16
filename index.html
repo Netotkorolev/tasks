@@ -67,7 +67,8 @@ textarea::placeholder{color:var(--text-tertiary)}
 .send-btn:active{opacity:0.85}
 .hint{font-size:12px;color:var(--text-tertiary);margin-top:6px;text-align:center}
 .section-label{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px}
-.task-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:8px;position:relative;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.task-card{background:var(--surface);border-radius:var(--r-lg);margin-bottom:8px;position:relative;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.06);cursor:pointer}
+#view-alltasks.select-mode-active .task-card,#view-done.select-mode-active .task-card{cursor:default}
 .task-card.dragging{opacity:0.4}
 .task-card.urgent{box-shadow:0 1px 3px rgba(0,0,0,0.06),inset 3px 0 0 var(--red)}
 .task-card.frog{border:1px solid rgba(139,92,246,0.3);background:rgba(139,92,246,0.06)}
@@ -779,15 +780,29 @@ function makeTaskEl(t,draggable){
       <button class="danger" onclick="closeAllTaskMenus();deleteTask(${t.id})">Удалить</button>
     </div>`;
   card.appendChild(main);
+  let isDragging=false;
   if(draggable){
     card.draggable=true;
     card.addEventListener('dragstart',e=>{
+      isDragging=true;
       e.dataTransfer.setData('text/plain',String(t.id));
       e.dataTransfer.effectAllowed='move';
       card.classList.add('dragging');
     });
-    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+    card.addEventListener('dragend',()=>{
+      card.classList.remove('dragging');
+      setTimeout(()=>{isDragging=false;},0);
+    });
   }
+  card.addEventListener('click',e=>{
+    if(isDragging)return;
+    if(selectMode)return;
+    if(e.target.closest('.check'))return;
+    if(e.target.closest('.task-menu-btn'))return;
+    if(e.target.closest('.task-menu'))return;
+    if(e.target.closest('button,input,select,textarea,label'))return;
+    openTaskEditor(t.id);
+  });
   return card;
 }
 let todayShowAllLightning=false;
