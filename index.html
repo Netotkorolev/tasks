@@ -984,6 +984,7 @@ function enterSelectMode(scope){
   }
 }
 function exitSelectMode(){
+  if(!selectMode)return;
   const scope=selectScope;
   selectMode=false;
   selectScope=null;
@@ -1169,6 +1170,7 @@ function updateHeader(name){
   document.getElementById('header-subtitle').textContent=subtitle;
 }
 function setView(name){
+  if(selectMode)exitSelectMode();
   const view=document.getElementById('view-'+name);
   if(!view)return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
