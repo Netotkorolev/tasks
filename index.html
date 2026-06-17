@@ -827,6 +827,8 @@ function makeTaskEl(t,draggable){
 }
 let todayShowAllLightning=false;
 let todayShowAllRest=false;
+let todayShowAllFrogs=false;
+let todayShowAllElephants=false;
 function renderToday(){
   const c=document.getElementById('today-content');c.innerHTML='';
   const now=new Date();
@@ -837,58 +839,75 @@ function renderToday(){
   const dueOk=t=>!t.due_date||t.due_date<=todayISO||st(t)==='doing';
   const shownIds=new Set();
 
-  // 1. Лягушка
+  // 1. Лягушки
   const activeOk=t=>isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t);
   const isFrogSize=t=>!t.effort||t.effort==='5m'||t.effort==='15m'||t.effort==='30m';
-  let frog=tasks.find(t=>activeOk(t)&&(t.frog_mode||'auto')==='manual'&&isFrogSize(t));
-  if(!frog){
-    const frogPool=tasks.filter(t=>activeOk(t)&&isFrogSize(t)&&(t.frog_mode||'auto')!=='blocked');
-    frog=frogPool.find(t=>t.urgent&&t.important);
-    if(!frog)frog=frogPool.find(t=>t.important&&!t.due_date);
-  }
-  if(frog)shownIds.add(frog.id);
+  const frogCandPool=tasks.filter(t=>activeOk(t)&&isFrogSize(t)&&(t.frog_mode||'auto')!=='blocked');
+  const frogsOrdered=[
+    ...frogCandPool.filter(t=>(t.frog_mode||'auto')==='manual'),
+    ...frogCandPool.filter(t=>(t.frog_mode||'auto')!=='manual'&&t.urgent&&t.important),
+    ...frogCandPool.filter(t=>(t.frog_mode||'auto')!=='manual'&&!(t.urgent&&t.important)&&t.important&&!t.due_date),
+  ];
+  const seenFrogIds=new Set();
+  const frogsAll=frogsOrdered.filter(t=>{if(seenFrogIds.has(t.id))return false;seenFrogIds.add(t.id);return true;});
+  const frogsShown=todayShowAllFrogs?frogsAll:frogsAll.slice(0,3);
+  const frogsMore=frogsAll.length-frogsShown.length;
+  frogsShown.forEach(t=>shownIds.add(t.id));
 
   // 2. Молнии
-  const lightningAll=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&(t.effort==='2m'||t.effort==='5m')&&activeStatuses.includes(st(t))&&dueOk(t));
-  lightningAll.forEach(t=>shownIds.add(t.id));
+  const lightningAll=tasks.filter(t=>!shownIds.has(t.id)&&activeOk(t)&&(t.effort==='2m'||t.effort==='5m'));
   const lightningShown=todayShowAllLightning?lightningAll:lightningAll.slice(0,5);
   const lightningMore=lightningAll.length-lightningShown.length;
+  lightningShown.forEach(t=>shownIds.add(t.id));
 
-  // 3. Кусочек слона
-  const elephant=tasks.find(t=>!shownIds.has(t.id)&&isActive(t)&&t.effort==='elephant'&&activeStatuses.includes(st(t))&&dueOk(t));
-  if(elephant)shownIds.add(elephant.id);
-
-  // 4. Срочно и важно
-  const urgentImportant=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t)&&t.urgent&&t.important);
+  // 3. Срочно и важно
+  const urgentImportant=tasks.filter(t=>!shownIds.has(t.id)&&activeOk(t)&&t.urgent&&t.important);
   urgentImportant.forEach(t=>shownIds.add(t.id));
 
-  // 5. Остальное
-  const restAll=tasks.filter(t=>!shownIds.has(t.id)&&isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t));
-  restAll.forEach(t=>shownIds.add(t.id));
+  // 4. Срочно
+  const urgentOnly=tasks.filter(t=>!shownIds.has(t.id)&&activeOk(t)&&t.urgent&&!t.important);
+  urgentOnly.forEach(t=>shownIds.add(t.id));
+
+  // 5. Важно
+  const importantOnly=tasks.filter(t=>!shownIds.has(t.id)&&activeOk(t)&&!t.urgent&&t.important);
+  importantOnly.forEach(t=>shownIds.add(t.id));
+
+  // 6. Слоны
+  const elephantsAll=tasks.filter(t=>!shownIds.has(t.id)&&activeOk(t)&&t.effort==='elephant');
+  const elephantsShown=todayShowAllElephants?elephantsAll:elephantsAll.slice(0,3);
+  const elephantsMore=elephantsAll.length-elephantsShown.length;
+  elephantsShown.forEach(t=>shownIds.add(t.id));
+
+  // 7. Остальное
+  const restAll=tasks.filter(t=>!shownIds.has(t.id)&&activeOk(t));
   const restShown=todayShowAllRest?restAll:restAll.slice(0,10);
   const restMore=restAll.length-restShown.length;
+  restShown.forEach(t=>shownIds.add(t.id));
 
-  // 6. Сделано
+  // 8. Сделано
   const done=tasks.filter(t=>t.done).slice(0,5);
 
-  const totalShown=(frog?1:0)+lightningShown.length+(elephant?1:0)+urgentImportant.length+restShown.length;
+  const totalShown=frogsShown.length+lightningShown.length+urgentImportant.length+urgentOnly.length+importantOnly.length+elephantsShown.length+restShown.length;
 
   if(totalShown===0){
     const empty=document.createElement('div');empty.className='empty';empty.textContent='Задач на сегодня нет 🎉';c.appendChild(empty);
   }else{
-    if(frog){
+    if(frogsShown.length){
       const l=document.createElement('div');l.className='section-label';l.textContent='🐸 Съешь лягушку';c.appendChild(l);
-      const card=makeTaskEl(frog);card.classList.add('frog');
-      const reason=document.createElement('div');reason.className='frog-reason';
-      if((frog.frog_mode||'auto')==='manual'){
-        reason.textContent='🐸 Лягушка назначена вручную';
-      }else if(frog.urgent&&frog.important){
-        reason.textContent='🐸 Срочно и неприятно — закрой первой';
-      }else{
-        reason.textContent='🐸 Откладываешь? Самое время сделать';
+      frogsShown.forEach(t=>{
+        const card=makeTaskEl(t);card.classList.add('frog');
+        const reason=document.createElement('div');reason.className='frog-reason';
+        if((t.frog_mode||'auto')==='manual'){reason.textContent='🐸 Лягушка назначена вручную';}
+        else if(t.urgent&&t.important){reason.textContent='🐸 Срочно и неприятно — закрой первой';}
+        else{reason.textContent='🐸 Откладываешь? Самое время сделать';}
+        card.querySelector('.task-text').insertAdjacentElement('afterend',reason);
+        c.appendChild(card);
+      });
+      if(frogsMore>0){
+        const btn=document.createElement('button');btn.className='more-link';btn.textContent=`ещё ${frogsMore} 🐸`;
+        btn.onclick=()=>{todayShowAllFrogs=true;renderToday();};
+        c.appendChild(btn);
       }
-      card.querySelector('.task-text').insertAdjacentElement('afterend',reason);
-      c.appendChild(card);
     }
     if(lightningShown.length){
       const l=document.createElement('div');l.className='section-label';l.textContent='⚡ Молнии';c.appendChild(l);
@@ -899,13 +918,26 @@ function renderToday(){
         c.appendChild(btn);
       }
     }
-    if(elephant){
-      const l=document.createElement('div');l.className='section-label';l.textContent='🐘 Один кусочек слона';c.appendChild(l);
-      c.appendChild(makeTaskEl(elephant));
-    }
     if(urgentImportant.length){
       const l=document.createElement('div');l.className='section-label';l.textContent='🔥 Срочно и важно';c.appendChild(l);
       urgentImportant.forEach(t=>c.appendChild(makeTaskEl(t)));
+    }
+    if(urgentOnly.length){
+      const l=document.createElement('div');l.className='section-label';l.textContent='🔥 Срочно';c.appendChild(l);
+      urgentOnly.forEach(t=>c.appendChild(makeTaskEl(t)));
+    }
+    if(importantOnly.length){
+      const l=document.createElement('div');l.className='section-label';l.textContent='⭐ Важно';c.appendChild(l);
+      importantOnly.forEach(t=>c.appendChild(makeTaskEl(t)));
+    }
+    if(elephantsShown.length){
+      const l=document.createElement('div');l.className='section-label';l.textContent='🐘 Слоны';c.appendChild(l);
+      elephantsShown.forEach(t=>c.appendChild(makeTaskEl(t)));
+      if(elephantsMore>0){
+        const btn=document.createElement('button');btn.className='more-link';btn.textContent=`ещё ${elephantsMore} 🐘`;
+        btn.onclick=()=>{todayShowAllElephants=true;renderToday();};
+        c.appendChild(btn);
+      }
     }
     if(restShown.length){
       const l=document.createElement('div');l.className='section-label';l.textContent='📋 Остальное';c.appendChild(l);
