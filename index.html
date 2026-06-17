@@ -896,11 +896,6 @@ function renderToday(){
       const l=document.createElement('div');l.className='section-label';l.textContent='🐸 Съешь лягушку';c.appendChild(l);
       frogsShown.forEach(t=>{
         const card=makeTaskEl(t);card.classList.add('frog');
-        const reason=document.createElement('div');reason.className='frog-reason';
-        if((t.frog_mode||'auto')==='manual'){reason.textContent='🐸 Лягушка назначена вручную';}
-        else if(t.urgent&&t.important){reason.textContent='🐸 Срочно и неприятно — закрой первой';}
-        else{reason.textContent='🐸 Откладываешь? Самое время сделать';}
-        card.querySelector('.task-text').insertAdjacentElement('afterend',reason);
         c.appendChild(card);
       });
       if(frogsMore>0){
