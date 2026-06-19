@@ -73,7 +73,7 @@ textarea::placeholder{color:var(--text-tertiary)}
 .task-card.urgent{box-shadow:0 1px 3px rgba(0,0,0,0.06),inset 3px 0 0 var(--red)}
 .task-card.frog{border:1px solid rgba(139,92,246,0.3);background:rgba(139,92,246,0.06)}
 .frog-reason{font-size:12px;color:var(--purple);font-weight:500;margin-top:4px}
-.board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scroll-snap-type:x mandatory;overscroll-behavior:contain}
+.board{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;touch-action:pan-x}
 .board-col{background:var(--surface);border-radius:var(--r-lg);min-width:280px;flex:0 0 280px;padding:10px;display:flex;flex-direction:column;scroll-snap-align:start}
 .board-col.drag-over{outline:2px dashed var(--accent);background:var(--accent-soft)}
 .board-col-header{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;padding:4px 4px 8px}
@@ -136,6 +136,16 @@ textarea::placeholder{color:var(--text-tertiary)}
 .modal-box input:focus,.modal-box select:focus,.modal-box textarea:focus{outline:none;border-color:var(--accent)}
 .checkbox-row{display:flex;align-items:center;gap:8px;margin-top:12px}
 .checkbox-row input{width:auto}
+.subtask-row{display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)}
+.subtask-row input[type=checkbox]{width:auto;flex-shrink:0}
+.subtask-row input[type=text]{flex:1;min-width:0;border:none;background:none;padding:4px;font-size:14px;font-family:inherit}
+.subtask-row input[type=date]{width:120px;flex-shrink:0;font-size:12px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2)}
+.subtask-row.done input[type=text]{text-decoration:line-through;color:var(--text-tertiary)}
+.subtask-del{background:none;border:none;color:var(--text-tertiary);font-size:16px;cursor:pointer;padding:0 4px;flex-shrink:0}
+.subtask-add-row{display:flex;gap:6px;margin-top:8px}
+.subtask-add-row input[type=text]{flex:1;min-width:0}
+.subtask-add-row input[type=date]{width:120px;flex-shrink:0;font-size:12px;padding:8px 4px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2)}
+.subtask-add-row button{padding:8px 12px;border-radius:var(--r-md);border:none;background:var(--accent-soft);color:var(--accent);font-weight:600;cursor:pointer;font-family:inherit}
 .modal-actions{display:flex;gap:8px;margin-top:18px}
 .modal-actions button{flex:1;padding:12px;border-radius:var(--r-md);border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation}
 .modal-actions .save-btn{background:var(--accent);color:#fff}
@@ -376,6 +386,13 @@ textarea::placeholder{color:var(--text-tertiary)}
       <input type="checkbox" id="edit-frog-mode">
       <label for="edit-frog-mode">🐸 Лягушка дня</label>
     </div>
+    <label class="field-label">Шаги</label>
+    <div id="edit-subtasks-list"></div>
+    <div class="subtask-add-row">
+      <input type="text" id="edit-subtask-new-text" placeholder="Добавить шаг">
+      <input type="date" id="edit-subtask-new-date">
+      <button type="button" onclick="addSubtaskFromEditor()">Добавить</button>
+    </div>
     <div class="modal-actions">
       <button class="cancel-btn" onclick="closeTaskEditor()">Отмена</button>
       <button class="save-btn" onclick="saveTaskEdit()">Сохранить</button>
@@ -436,6 +453,7 @@ const BOARD_COLUMNS=[
 ];
 const supabaseClient=supabase.createClient(SUPA_URL,SUPA_KEY);
 let tasks=[];
+let subtaskProgress=new Map(); // task_id -> {total, done}
 async function dbFetch(path,opts={}){
   const {data:{session}}=await supabaseClient.auth.getSession();
   const token=session?session.access_token:SUPA_KEY;
@@ -467,8 +485,24 @@ function showLogin(){
   document.getElementById('app').style.display='none';
   document.getElementById('login-password').value='';
 }
+async function loadSubtaskProgress(){
+  try{
+    const rows=await dbFetch('subtasks?select=task_id,done');
+    const map=new Map();
+    rows.forEach(r=>{
+      const cur=map.get(r.task_id)||{total:0,done:0};
+      cur.total++;
+      if(r.done)cur.done++;
+      map.set(r.task_id,cur);
+    });
+    subtaskProgress=map;
+  }catch(e){subtaskProgress=new Map();}
+}
 async function loadTasks(){
-  try{tasks=await dbFetch('tasks?select=*&order=created_at.desc');}catch(e){tasks=[];}
+  try{
+    const [t]=await Promise.all([dbFetch('tasks?select=*&order=created_at.desc'),loadSubtaskProgress()]);
+    tasks=t;
+  }catch(e){tasks=[];}
   renderAll();
 }
 async function toggleTask(id){
@@ -678,6 +712,7 @@ function toggleTaskMenu(e,btn){
   if(willOpen)menu.classList.add('open');
 }
 let editingTaskId=null;
+let editingSubtasks=[];
 function openTaskEditor(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;
   editingTaskId=id;
@@ -691,10 +726,83 @@ function openTaskEditor(id){
   document.getElementById('edit-important').checked=!!t.important;
   document.getElementById('edit-frog-mode').checked=(t.frog_mode||'auto')==='manual';
   document.getElementById('edit-overlay').classList.add('active');
+  editingSubtasks=[];
+  renderSubtasksInEditor();
+  loadSubtasksForTask(id).then(list=>{
+    if(editingTaskId!==id)return;
+    editingSubtasks=list;
+    renderSubtasksInEditor();
+  });
 }
 function closeTaskEditor(){
   editingTaskId=null;
   document.getElementById('edit-overlay').classList.remove('active');
+}
+async function loadSubtasksForTask(taskId){
+  try{return await dbFetch('subtasks?task_id=eq.'+taskId+'&select=*&order=position.asc');}catch(e){return[];}
+}
+function renderSubtasksInEditor(){
+  const c=document.getElementById('edit-subtasks-list');
+  c.innerHTML='';
+  editingSubtasks.forEach(s=>{
+    const row=document.createElement('div');
+    row.className='subtask-row'+(s.done?' done':'');
+    row.innerHTML=`
+      <input type="checkbox" ${s.done?'checked':''} onchange="toggleSubtask(${s.id},this.checked)">
+      <input type="text" value="${escHtml(s.text)}" onblur="renameSubtask(${s.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <input type="date" value="${escHtml(s.due_date||'')}" onchange="updateSubtaskDueDate(${s.id},this.value)">
+      <button type="button" class="subtask-del" onclick="deleteSubtask(${s.id})">✕</button>`;
+    c.appendChild(row);
+  });
+}
+function refreshSubtaskProgressFor(taskId){
+  const total=editingSubtasks.length;
+  const done=editingSubtasks.filter(s=>s.done).length;
+  if(total)subtaskProgress.set(taskId,{total,done});
+  else subtaskProgress.delete(taskId);
+  renderAll();
+}
+async function addSubtaskFromEditor(){
+  if(editingTaskId===null)return;
+  const textInput=document.getElementById('edit-subtask-new-text');
+  const dateInput=document.getElementById('edit-subtask-new-date');
+  const text=textInput.value.trim();
+  if(!text)return;
+  const due_date=dateInput.value||null;
+  const position=editingSubtasks.length?Math.max(...editingSubtasks.map(s=>s.position))+1:0;
+  const taskId=editingTaskId;
+  const created=await dbFetch('subtasks',{method:'POST',body:JSON.stringify({task_id:taskId,text,due_date,position})});
+  if(Array.isArray(created)&&created.length)editingSubtasks.push(created[0]);
+  textInput.value='';
+  dateInput.value='';
+  renderSubtasksInEditor();
+  refreshSubtaskProgressFor(taskId);
+}
+async function toggleSubtask(id,done){
+  const taskId=editingTaskId;
+  await dbFetch('subtasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({done})});
+  const s=editingSubtasks.find(x=>x.id===id);if(s)s.done=done;
+  renderSubtasksInEditor();
+  refreshSubtaskProgressFor(taskId);
+}
+async function renameSubtask(id,text){
+  text=text.trim();
+  const s=editingSubtasks.find(x=>x.id===id);
+  if(!text||!s||s.text===text)return;
+  await dbFetch('subtasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({text})});
+  s.text=text;
+}
+async function updateSubtaskDueDate(id,date){
+  const due_date=date||null;
+  await dbFetch('subtasks?id=eq.'+id,{method:'PATCH',body:JSON.stringify({due_date})});
+  const s=editingSubtasks.find(x=>x.id===id);if(s)s.due_date=due_date;
+}
+async function deleteSubtask(id){
+  const taskId=editingTaskId;
+  await dbFetch('subtasks?id=eq.'+id,{method:'DELETE'});
+  editingSubtasks=editingSubtasks.filter(x=>x.id!==id);
+  renderSubtasksInEditor();
+  refreshSubtaskProgressFor(taskId);
 }
 async function saveTaskEdit(){
   if(editingTaskId===null)return;
@@ -770,7 +878,8 @@ async function createTask(){
   closeCreateTaskModal();
   renderAll();
 }
-function makeTaskEl(t,draggable){
+function makeTaskEl(t,draggable,opts={}){
+  const showSubtasks=opts.showSubtasks!==false;
   const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
   const ds=fmtDate(t.due_date);
   const isDone=t.done||t.status==='done';
@@ -783,6 +892,11 @@ function makeTaskEl(t,draggable){
   const metaParts=[];
   if(ds)metaParts.push(isOverdue?`<span class="meta-overdue">${ds}</span>`:ds);
   if(effortLabel)metaParts.push(effortLabel);
+  if(showSubtasks){
+    const p=subtaskProgress.get(t.id);
+    if(p&&p.total)metaParts.push(`${p.done}/${p.total} шагов`);
+    else if(t.effort==='elephant')metaParts.push('Разбей слона на шаги 🐘');
+  }
   metaParts.push(`<span class="proj-dot" style="background:${proj.color}"></span>${proj.name}`);
   main.innerHTML=`
     <div class="check${t.done?' done':''}" onclick="toggleTask(${t.id})">
@@ -841,8 +955,7 @@ function renderToday(){
 
   // 1. Лягушки
   const activeOk=t=>isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t);
-  const isFrogSize=t=>!t.effort||t.effort==='5m'||t.effort==='15m'||t.effort==='30m';
-  const frogsAll=tasks.filter(t=>activeOk(t)&&isFrogSize(t)&&(t.frog_mode||'auto')==='manual');
+  const frogsAll=tasks.filter(t=>activeOk(t)&&(t.frog_mode||'auto')==='manual');
   const frogsShown=todayShowAllFrogs?frogsAll:frogsAll.slice(0,3);
   const frogsMore=frogsAll.length-frogsShown.length;
   frogsShown.forEach(t=>shownIds.add(t.id));
@@ -988,7 +1101,7 @@ function renderBoard(){
     header.innerHTML=`<span>${col.name}</span><span class="board-col-count">${colTasks.length}</span>`;
     colEl.appendChild(header);
     const body=document.createElement('div');body.className='board-col-tasks';
-    colTasks.forEach(t=>body.appendChild(makeTaskEl(t,true)));
+    colTasks.forEach(t=>body.appendChild(makeTaskEl(t,true,{showSubtasks:false})));
     colEl.appendChild(body);
     colEl.addEventListener('dragover',e=>{e.preventDefault();colEl.classList.add('drag-over');});
     colEl.addEventListener('dragleave',()=>colEl.classList.remove('drag-over'));
