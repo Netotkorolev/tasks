@@ -842,14 +842,7 @@ function renderToday(){
   // 1. Лягушки
   const activeOk=t=>isActive(t)&&activeStatuses.includes(st(t))&&dueOk(t);
   const isFrogSize=t=>!t.effort||t.effort==='5m'||t.effort==='15m'||t.effort==='30m';
-  const frogCandPool=tasks.filter(t=>activeOk(t)&&isFrogSize(t)&&(t.frog_mode||'auto')!=='blocked');
-  const frogsOrdered=[
-    ...frogCandPool.filter(t=>(t.frog_mode||'auto')==='manual'),
-    ...frogCandPool.filter(t=>(t.frog_mode||'auto')!=='manual'&&t.urgent&&t.important),
-    ...frogCandPool.filter(t=>(t.frog_mode||'auto')!=='manual'&&!(t.urgent&&t.important)&&t.important&&!t.due_date),
-  ];
-  const seenFrogIds=new Set();
-  const frogsAll=frogsOrdered.filter(t=>{if(seenFrogIds.has(t.id))return false;seenFrogIds.add(t.id);return true;});
+  const frogsAll=tasks.filter(t=>activeOk(t)&&isFrogSize(t)&&(t.frog_mode||'auto')==='manual');
   const frogsShown=todayShowAllFrogs?frogsAll:frogsAll.slice(0,3);
   const frogsMore=frogsAll.length-frogsShown.length;
   frogsShown.forEach(t=>shownIds.add(t.id));
