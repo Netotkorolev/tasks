@@ -209,6 +209,12 @@ textarea::placeholder{color:var(--text-tertiary)}
 .draft-notes-input{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--border);border-radius:0;padding:4px 0;font-size:12px;color:var(--text-secondary);font-family:inherit;resize:none;min-height:18px;line-height:1.4;overflow:hidden;margin-top:6px}
 .draft-notes-input:focus{outline:none;border-bottom-color:var(--accent)}
 .draft-notes-input::placeholder{color:var(--text-tertiary)}
+.draft-subtasks{margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)}
+.draft-subtasks-label{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px}
+.draft-subtask-row{display:flex;align-items:center;gap:6px;padding:3px 0}
+.draft-subtask-row input[type=text]{flex:1;min-width:0;border:none;background:none;padding:2px;font-size:13px;font-family:inherit;color:var(--text)}
+.draft-subtask-row input[type=date]{width:110px;flex-shrink:0;font-size:11px;padding:3px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2)}
+.draft-subtask-del{background:none;border:none;color:var(--text-tertiary);font-size:14px;cursor:pointer;padding:0 4px;flex-shrink:0}
 .draft-all-added{font-size:13px;color:var(--green);font-weight:500;margin-bottom:8px;margin-top:4px}
 .select-mode-btn{margin-left:auto;flex-shrink:0;padding:5px 11px;background:none;border:1px solid var(--border);border-radius:var(--r-md);font-size:13px;color:var(--text-secondary);cursor:pointer;font-family:inherit;touch-action:manipulation}
 .select-bar{display:none;align-items:center;gap:8px;padding:0 var(--sp-4) 8px}
@@ -553,6 +559,30 @@ async function sendMsg(){
     lm.innerHTML='<div class="sec-bubble-label">Секретарь</div><div class="sec-bubble-text" style="color:var(--red)">Ошибка: '+(e instanceof Error?e.message:String(e))+'</div>';
   }
 }
+function buildDraftSubtasksHTML(blockId,taskIndex,subtasks){
+  let html='<div class="draft-subtasks"><div class="draft-subtasks-label">Шаги ('+subtasks.length+')</div>';
+  subtasks.forEach((s,si)=>{
+    html+='<div class="draft-subtask-row">'
+      +'<input type="text" value="'+escHtml(s.text)+'" onchange="setDraftSubtaskField('+blockId+','+taskIndex+','+si+',\'text\',this.value)">'
+      +'<input type="date" value="'+(s.due_date||'')+'" onchange="setDraftSubtaskField('+blockId+','+taskIndex+','+si+',\'due_date\',this.value||null)">'
+      +'<button type="button" class="draft-subtask-del" onclick="removeDraftSubtask('+blockId+','+taskIndex+','+si+')">✕</button>'
+      +'</div>';
+  });
+  html+='</div>';
+  return html;
+}
+function setDraftSubtaskField(blockId,i,si,field,value){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const subtasks=block.tasks[i]?.subtasks;if(!subtasks||!subtasks[si])return;
+  subtasks[si][field]=value;
+}
+function removeDraftSubtask(blockId,i,si){
+  const block=draftBlocks.get(blockId);if(!block)return;
+  const subtasks=block.tasks[i]?.subtasks;if(!subtasks)return;
+  subtasks.splice(si,1);
+  const el=document.getElementById('draft-block-'+blockId);
+  if(el)el.innerHTML=buildDraftsHTML(blockId,block.tasks);
+}
 function buildDraftsHTML(blockId,list){
   if(!list.length)return'<div class="sec-bubble-label">Секретарь</div><div class="sec-bubble-text">Задач не найдено</div>';
   const n=list.length;
@@ -588,6 +618,7 @@ function buildDraftsHTML(blockId,list){
         +'<label><input type="checkbox"'+((t.frog_mode||'auto')==='manual'?' checked':'')+' onchange="setDraftField('+blockId+','+i+',\'frog_mode\',this.checked?\'manual\':\'auto\')"> 🐸 Лягушка</label>'
         +'</div>'
         +'<textarea class="draft-notes-input" rows="1" placeholder="Заметки..." oninput="setDraftField('+blockId+','+i+',\'notes\',this.value||null);autoResize(this)">'+escHtml(t.notes||'')+'</textarea>'
+        +(t.subtasks&&t.subtasks.length?buildDraftSubtasksHTML(blockId,i,t.subtasks):'')
         +'</div></div></div>';
     }
   });
@@ -663,23 +694,50 @@ function removeDraftBlock(blockId){
 }
 async function confirmDrafts(blockId){
   const block=draftBlocks.get(blockId);if(!block)return;
-  const toSave=block.tasks
-    .filter(t=>t._status==='pending'&&t._included)
-    .map(({_included,_status,...rest})=>({...rest,frog_mode:rest.frog_mode||'auto',done:false}));
-  if(!toSave.length)return;
+  const pendingIndices=block.tasks
+    .map((t,i)=>i)
+    .filter(i=>block.tasks[i]._status==='pending'&&block.tasks[i]._included);
+  if(!pendingIndices.length)return;
   const btn=document.getElementById('draft-confirm-btn-'+blockId);
   if(btn){btn.textContent='Сохраняю...';btn.disabled=true;}
-  try{
-    const created=await dbFetch('tasks',{method:'POST',body:JSON.stringify(toSave)});
-    if(Array.isArray(created))created.forEach(t=>tasks.unshift(t));
-    block.tasks.forEach(t=>{
-      if(t._status==='pending'&&t._included)t._status='added';
-    });
-    const el=document.getElementById('draft-block-'+blockId);
-    if(el)el.innerHTML=buildDraftsHTML(blockId,block.tasks);
-    renderAll();
-  }catch(e){
-    if(btn){btn.textContent='Ошибка — попробуй снова';btn.disabled=false;}
+  let taskCreateFailed=false;
+  const subtaskFailures=[];
+  for(const i of pendingIndices){
+    const draft=block.tasks[i];
+    const {_included,_status,subtasks,...rest}=draft;
+    const payload={...rest,frog_mode:rest.frog_mode||'auto',done:false};
+    let createdTask;
+    try{
+      const createdRows=await dbFetch('tasks',{method:'POST',body:JSON.stringify(payload)});
+      createdTask=Array.isArray(createdRows)?createdRows[0]:null;
+      if(!createdTask)throw new Error('Пустой ответ от сервера');
+    }catch(e){
+      taskCreateFailed=true;
+      break;
+    }
+    tasks.unshift(createdTask);
+    block.tasks[i]._status='added';
+    if(Array.isArray(subtasks)&&subtasks.length){
+      try{
+        const subtaskRows=subtasks.map((s,idx)=>({task_id:createdTask.id,text:s.text,due_date:s.due_date||null,position:idx}));
+        await dbFetch('subtasks',{method:'POST',body:JSON.stringify(subtaskRows)});
+      }catch(e){
+        subtaskFailures.push(draft.text);
+      }
+    }
+  }
+  const el=document.getElementById('draft-block-'+blockId);
+  if(el)el.innerHTML=buildDraftsHTML(blockId,block.tasks);
+  renderAll();
+  if(taskCreateFailed||subtaskFailures.length){
+    const parts=[];
+    if(taskCreateFailed)parts.push('Не удалось сохранить часть задач — попробуй снова.');
+    if(subtaskFailures.length)parts.push('Не удалось сохранить шаги для: '+subtaskFailures.join(', ')+'. Добавь их вручную в редакторе задачи.');
+    const msg=document.createElement('div');
+    msg.className='sec-bubble-text';
+    msg.style.color='var(--red)';
+    msg.textContent=parts.join(' ');
+    if(el)el.appendChild(msg);
   }
 }
 

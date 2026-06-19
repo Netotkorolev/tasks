@@ -10,6 +10,17 @@ const ALLOWED_PROJECTS = ['law', 'popcorn', 'politics', 'fencing', 'china', 'ist
 const ALLOWED_EFFORT = ['2m', '5m', '15m', '30m', '60m', 'elephant'];
 const ALLOWED_STATUS = ['inbox', 'next', 'scheduled', 'waiting', 'someday'];
 const MAX_TASKS = 20;
+const MAX_SUBTASKS = 10;
+
+const SUBTASK_SCHEMA = {
+  type: 'object',
+  properties: {
+    text: { type: 'string' },
+    due_date: { type: ['string', 'null'] },
+  },
+  required: ['text', 'due_date'],
+  additionalProperties: false,
+};
 
 const TASK_SCHEMA = {
   type: 'object',
@@ -28,8 +39,9 @@ const TASK_SCHEMA = {
           effort: { type: ['string', 'null'], enum: [...ALLOWED_EFFORT, null] },
           status: { type: 'string', enum: ALLOWED_STATUS },
           desc: { type: ['string', 'null'] },
+          subtasks: { type: 'array', items: SUBTASK_SCHEMA },
         },
-        required: ['text', 'project', 'urgent', 'important', 'due_date', 'notes', 'effort', 'status', 'desc'],
+        required: ['text', 'project', 'urgent', 'important', 'due_date', 'notes', 'effort', 'status', 'desc', 'subtasks'],
         additionalProperties: false,
       },
     },
@@ -187,7 +199,32 @@ notes = null, если полезного контекста нет. Не дуб
 - "после того как пришлют" без конкретной даты → due_date=null, status="waiting".
 
 11. DESC
-Короткое опциональное уточнение задачи, или null, если всё уже сказано в text/notes.`;
+Короткое опциональное уточнение задачи, или null, если всё уже сказано в text/notes.
+
+12. ПОДЗАДАЧИ (subtasks)
+subtasks — массив шагов вида {text, due_date}. По умолчанию subtasks=[] (пустой массив) — это норма для большинства задач, не пытайся придумать шаги "на всякий случай".
+Создавай subtasks ТОЛЬКО если выполняется одно из условий:
+- effort="elephant" И в тексте пользователя явно описаны шаги/этапы (а не просто "сделать сайт" без деталей — тогда subtasks=[]);
+- пользователь сам перечислил шаги списком ("сначала... потом... и в конце...", "1) ... 2) ... 3) ...") — даже если effort не elephant.
+Если ни одно условие не выполняется — subtasks=[], даже для крупных задач.
+Каждый шаг — короткое самостоятельное действие, без "надо бы"/эмоций, в том же стиле, что text задачи.
+due_date шага: ставь дату ТОЛЬКО если она явно названа в тексте именно для этого шага (например "сначала бухгалтерия до среды, потом подписание в пятницу"). Если дата не названа для конкретного шага — due_date=null. Не выводи дату шага из даты родительской задачи и не пытайся вычислить её сам.
+Максимум ${MAX_SUBTASKS} шагов на задачу.`;
+}
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateSubtasks(raw: any): { text: string; due_date: string | null }[] {
+  if (!Array.isArray(raw)) return [];
+  const result: { text: string; due_date: string | null }[] = [];
+  for (const s of raw) {
+    if (!s || typeof s.text !== 'string' || !s.text.trim()) continue;
+    const text = s.text.trim();
+    const due_date = typeof s.due_date === 'string' && DATE_REGEX.test(s.due_date) ? s.due_date : null;
+    result.push({ text, due_date });
+    if (result.length >= MAX_SUBTASKS) break;
+  }
+  return result;
 }
 
 function validateTask(t: any) {
@@ -196,14 +233,15 @@ function validateTask(t: any) {
   const project = ALLOWED_PROJECTS.includes(t.project) ? t.project : 'other';
   const urgent = !!t.urgent;
   const important = !!t.important;
-  const due_date = typeof t.due_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.due_date) ? t.due_date : null;
+  const due_date = typeof t.due_date === 'string' && DATE_REGEX.test(t.due_date) ? t.due_date : null;
   const desc = typeof t.desc === 'string' && t.desc.trim() ? t.desc.trim() : null;
   let notes = typeof t.notes === 'string' && t.notes.trim() ? t.notes.trim() : null;
   if (notes && notes === text) notes = null;
   const effort = ALLOWED_EFFORT.includes(t.effort) ? t.effort : null;
   let status = ALLOWED_STATUS.includes(t.status) ? t.status : null;
   if (!status) status = due_date ? 'scheduled' : 'next';
-  return { text, project, urgent, important, due_date, notes, effort, status, desc, done: false };
+  const subtasks = validateSubtasks(t.subtasks);
+  return { text, project, urgent, important, due_date, notes, effort, status, desc, subtasks, done: false };
 }
 
 // "до пятницы" / "к пятнице" / "в пятницу" (и формы для других падежей) + аналоги для остальных дней недели.
@@ -406,9 +444,10 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, tasks: dedupedTasks });
     }
 
+    const tasksToInsert = dedupedTasks.map(({ subtasks, ...rest }: any) => rest);
     const { data: created, error: insertError } = await supabaseClient
       .from('tasks')
-      .insert(dedupedTasks)
+      .insert(tasksToInsert)
       .select();
     if (insertError) {
       return jsonResponse({ error: 'Ошибка сохранения задач: ' + insertError.message }, 500);
