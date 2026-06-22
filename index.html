@@ -254,7 +254,7 @@ textarea::placeholder{color:var(--text-tertiary)}
   <div class="drawer-items">
     <button class="drawer-item active" data-view="secretary" onclick="setView('secretary')">Секретарь</button>
     <button class="drawer-item" data-view="today" onclick="setView('today')">Сегодня</button>
-    <button class="drawer-item" data-view="board" onclick="setView('board')">Доска</button>
+    <button class="drawer-item" data-view="board" onclick="setView('board')" style="display:none">Доска</button>
     <button class="drawer-item" data-view="alltasks" onclick="openAllTasksView()">Все задачи</button>
     <button class="drawer-item" data-view="done" onclick="openDoneView()">Выполнено</button>
     <div class="drawer-divider"></div>
@@ -1114,7 +1114,8 @@ function renderToday(){
     done.forEach(t=>c.appendChild(makeTaskEl(t)));
   }
 
-  // Индикатор скрытых задач
+  // Индикатор скрытых задач — переход на Доску отключён, Доска временно убрана из навигации (код сохранён ниже)
+  /*
   const inboxCount=tasks.filter(t=>isActive(t)&&st(t)==='inbox').length;
   const waitingCount=tasks.filter(t=>isActive(t)&&st(t)==='waiting').length;
   const laterCount=tasks.filter(t=>isActive(t)&&t.due_date&&t.due_date>todayISO&&st(t)!=='doing').length;
@@ -1128,6 +1129,7 @@ function renderToday(){
     ind.onclick=()=>switchTabByName('board');
     c.appendChild(ind);
   }
+  */
 }
 function renderProjects(){
   const c=document.getElementById('proj-content');c.innerHTML='';
