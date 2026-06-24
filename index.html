@@ -1324,7 +1324,7 @@ function renderAllTasks(){
     b.classList.toggle('active',b.dataset.filter===allTasksFilter);
   });
   const projectChip=document.getElementById('alltasks-project-chip');
-  const proj=allTasksProjectFilter?PROJECTS.find(p=>p.id===allTasksProjectFilter):null;
+  const proj=allTasksProjectFilter?getProjectById(allTasksProjectFilter):null;
   if(proj){
     projectChip.style.display='';
     document.getElementById('alltasks-project-dot').style.background=proj.color;
