@@ -954,7 +954,7 @@ async function createTask(){
 }
 function makeTaskEl(t,draggable,opts={}){
   const showSubtasks=opts.showSubtasks!==false;
-  const proj=PROJECTS.find(p=>p.id===t.project)||PROJECTS[PROJECTS.length-1];
+  const proj=getProjectById(t.project);
   const ds=fmtDate(t.due_date);
   const isDone=t.done||t.status==='done';
   const isUrgent=!isDone&&t.important&&t.urgent;
