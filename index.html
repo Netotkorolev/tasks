@@ -430,6 +430,13 @@ function getProjectColor(slug){
   for(let i=0;i<s.length;i++)hash=(hash*31+s.charCodeAt(i))>>>0;
   return 'hsl('+(hash%360)+',60%,55%)';
 }
+function getProjectById(slug){
+  let p=PROJECTS.find(x=>x.id===slug);
+  if(p)return p;
+  p=DEFAULT_PROJECTS.find(x=>x.id===slug);
+  if(p)return p;
+  return {id:slug,name:slug||'Разное',color:getProjectColor(slug),is_active:true};
+}
 const STATUS_OPTIONS=[
   {id:'inbox',name:'Входящие'},
   {id:'next',name:'Без даты'},
